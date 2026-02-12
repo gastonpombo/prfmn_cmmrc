@@ -77,7 +77,7 @@ export function CheckoutForm({ cartItems, onSuccess, onError }: CheckoutFormProp
       const data: CheckoutResponse = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || 'Error al procesar el pago')
+        throw new Error((data as any).error || 'Error al procesar el pago')
       }
 
       if (data.success && data.init_point) {

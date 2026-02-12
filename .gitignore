@@ -9,6 +9,8 @@ instrumentation-client.ts
 node_modules/
 .next/
 .env
-.env*.local
+
 .DS_Store
 .vercel
+.env.local
+tsconfig.tsbuildinfo

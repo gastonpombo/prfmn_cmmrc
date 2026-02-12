@@ -21,7 +21,7 @@ export default function ProfilePage() {
         console.log("[v0] Verificando sesión...")
         const { data: { session } } = await supabase.auth.getSession()
         console.log("[v0] Sesión obtenida:", { user: session?.user?.email })
-        
+
         if (!session) {
           console.log("[v0] No hay sesión, redirigiendo a login")
           router.push("/login")
@@ -44,7 +44,7 @@ export default function ProfilePage() {
           console.log("[v0] Órdenes encontradas:", ordersData?.length)
           setOrders(ordersData || [])
         }
-        
+
         setLoading(false)
       } catch (err) {
         console.error("[v0] Error en profile:", err)
@@ -131,17 +131,16 @@ export default function ProfilePage() {
                         Pedido #{order.id}
                       </p>
                       <p className="font-serif text-2xl text-secondary">
-                        ${order.total.toLocaleString("es-AR")}
+                        ${order.total_amount.toLocaleString("es-AR")}
                       </p>
                     </div>
                     <span
-                      className={`border px-3 py-1 font-sans text-xs uppercase tracking-wider ${
-                        order.status === "completado"
-                          ? "border-secondary/30 bg-secondary/10 text-secondary"
-                          : order.status === "pendiente"
-                            ? "border-highlight/30 bg-highlight/10 text-highlight"
-                            : "border-muted bg-muted/10 text-muted-foreground"
-                      }`}
+                      className={`border px-3 py-1 font-sans text-xs uppercase tracking-wider ${order.status === "completado"
+                        ? "border-secondary/30 bg-secondary/10 text-secondary"
+                        : order.status === "pendiente"
+                          ? "border-highlight/30 bg-highlight/10 text-highlight"
+                          : "border-muted bg-muted/10 text-muted-foreground"
+                        }`}
                     >
                       {order.status}
                     </span>
@@ -150,7 +149,7 @@ export default function ProfilePage() {
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                       <span className="font-sans text-sm text-muted-foreground">
-                        {new Date(order.created_at).toLocaleDateString("es-AR")}
+                        {order.created_at ? new Date(order.created_at).toLocaleDateString("es-AR") : '-'}
                       </span>
                     </div>
                     {order.payment_id && (

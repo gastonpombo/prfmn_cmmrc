@@ -26,7 +26,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
     notFound()
   }
 
-  const relatedProducts = await getRelatedProducts(product.category, product.id, 4)
+  const relatedProducts = product.category ? await getRelatedProducts(product.category, product.id, 4) : []
 
   // Fetch all categories for sidebar
   const supabase = getSupabaseClient()
@@ -90,8 +90,8 @@ export default async function ProductPage({ params }: ProductPageProps) {
                           key={cat.id}
                           href={`/shop?category=${cat.id}`}
                           className={`block font-sans text-sm transition-colors ${product.category === cat.id
-                              ? "font-semibold text-secondary"
-                              : "text-muted-foreground hover:text-secondary"
+                            ? "font-semibold text-secondary"
+                            : "text-muted-foreground hover:text-secondary"
                             }`}
                         >
                           {cat.name}
