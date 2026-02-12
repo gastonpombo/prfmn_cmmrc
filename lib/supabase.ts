@@ -156,6 +156,9 @@ export type CheckoutResponse = {
   order_id: number
   init_point: string // URL de Mercado Pago
   preference_id: string
+  error?: string
+  details?: string[] | string
+  missing_products?: number[]
 }
 
 export type SiteConfig = {

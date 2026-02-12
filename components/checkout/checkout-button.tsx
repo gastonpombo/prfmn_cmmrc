@@ -16,7 +16,7 @@ type CheckoutResponse = {
   preference_id: string
   total_amount: number
   error?: string
-  details?: string[] // Errores específicos (ej: stock insuficiente)
+  details?: string[] | string // Errores específicos (ej: stock insuficiente)
   missing_products?: number[]
 }
 
@@ -117,16 +117,22 @@ export function CheckoutButton({
         const errorMsg = data.error || 'Error al procesar el pago'
 
         // Si hay detalles específicos (ej: "Stock insuficiente para X")
-        if (data.details && data.details.length > 0) {
-          // Mostrar cada error específico
-          data.details.forEach((detail) => {
-            toast.error(detail, {
+        if (data.details) {
+          if (Array.isArray(data.details) && data.details.length > 0) {
+            // Mostrar cada error específico
+            data.details.forEach((detail) => {
+              toast.error(detail, {
+                duration: 5000,
+              })
+            })
+            // Callback con el primer error
+            onError?.(data.details[0])
+          } else if (typeof data.details === 'string') {
+            toast.error(data.details, {
               duration: 5000,
             })
-          })
-
-          // Callback con el primer error
-          onError?.(data.details[0])
+            onError?.(data.details)
+          }
         } else {
           // Error genérico
           toast.error(errorMsg, {
