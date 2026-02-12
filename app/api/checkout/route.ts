@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getSupabaseClient } from "@/lib/supabase"
+import { getSupabaseAdminClient } from "@/lib/supabase"
 import { MercadoPagoConfig, Preference } from "mercadopago"
 
 // ============================================
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const supabase = getSupabaseClient()
+    const supabase = getSupabaseAdminClient()
 
     // ============================================
     // 4. 🔒 SEGURIDAD: Validar productos y precios desde la DB
@@ -263,14 +263,14 @@ export async function POST(request: NextRequest) {
             email: customer_info.email,
             phone: customer_info.phone
               ? {
-                  number: customer_info.phone,
-                }
+                number: customer_info.phone,
+              }
               : undefined,
             address: customer_info.address
               ? {
-                  street_name: customer_info.address.street,
-                  zip_code: customer_info.address.postal_code,
-                }
+                street_name: customer_info.address.street,
+                zip_code: customer_info.address.postal_code,
+              }
               : undefined,
           },
           back_urls: {
