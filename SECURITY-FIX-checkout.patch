@@ -1,0 +1,159 @@
+# 🔒 FIX CRÍTICO: Validación de Precios y Stock en Checkout
+
+## Aplicar este parche al archivo: app/api/checkout/route.ts
+
+### Reemplazar la sección de cálculo de total (líneas ~65-68) con:
+
+```typescript
+// ============================================
+// 4. Validar productos y calcular total desde la DB
+// ============================================
+
+// 🔒 SEGURIDAD: NO confiar en precios del frontend
+// Consultar precios reales desde la base de datos
+
+const productIds = items.map(item => item.id)
+
+const { data: realProducts, error: productsError } = await supabase
+  .from('products')
+  .select('id, name, price, stock')
+  .in('id', productIds)
+
+if (productsError || !realProducts) {
+  console.error('❌ Error al obtener productos:', productsError)
+  return NextResponse.json(
+    { error: 'Error al validar productos' },
+    { status: 500 }
+  )
+}
+
+// Validar que todos los productos existan
+if (realProducts.length !== items.length) {
+  const missingIds = items
+    .filter(item => !realProducts.find(p => p.id === item.id))
+    .map(item => item.id)
+
+  console.error('❌ Productos no encontrados:', missingIds)
+  return NextResponse.json(
+    { error: 'Algunos productos no están disponibles' },
+    { status: 400 }
+  )
+}
+
+// Validar stock y calcular total con precios reales
+let total_amount = 0
+const validationErrors: string[] = []
+
+for (const item of items) {
+  const dbProduct = realProducts.find(p => p.id === item.id)
+
+  if (!dbProduct) {
+    validationErrors.push(`Producto ${item.name} no encontrado`)
+    continue
+  }
+
+  // Validar stock disponible
+  if (dbProduct.stock < item.quantity) {
+    validationErrors.push(
+      `Stock insuficiente para ${dbProduct.name}. ` +
+      `Disponible: ${dbProduct.stock}, solicitado: ${item.quantity}`
+    )
+    continue
+  }
+
+  // ✅ Usar precio real de la base de datos
+  total_amount += dbProduct.price * item.quantity
+
+  // Log de diferencia si el frontend envió precio incorrecto
+  if (Math.abs(item.price - dbProduct.price) > 0.01) {
+    console.warn(
+      `⚠️ Precio incorrecto detectado para producto ${dbProduct.name}: ` +
+      `frontend=${item.price}, db=${dbProduct.price}`
+    )
+  }
+}
+
+// Si hay errores de validación, retornar error
+if (validationErrors.length > 0) {
+  return NextResponse.json(
+    {
+      error: 'Error de validación',
+      details: validationErrors
+    },
+    { status: 400 }
+  )
+}
+
+// Validar total final
+if (total_amount <= 0) {
+  return NextResponse.json(
+    { error: 'El total debe ser mayor a 0' },
+    { status: 400 }
+  )
+}
+
+console.log(`✅ Validación completada: Total calculado = $${total_amount}`)
+```
+
+### También actualizar la creación de order_items para usar precios reales:
+
+```typescript
+// ============================================
+// PASO 2: Insertar los order_items (CON PRECIOS VALIDADOS)
+// ============================================
+
+const orderItems = items.map((item) => {
+  const dbProduct = realProducts.find(p => p.id === item.id)!
+
+  return {
+    order_id: orderId,
+    product_id: item.id,
+    quantity: item.quantity,
+    unit_price: dbProduct.price, // ✅ Usar precio real de la DB
+  }
+})
+
+const { error: itemsError } = await supabase.from("order_items").insert(orderItems)
+```
+
+---
+
+## Beneficios de este Fix:
+
+✅ **Previene fraude:** Usuario no puede manipular precios
+✅ **Valida stock:** Evita órdenes inválidas
+✅ **Detecta discrepancias:** Log si frontend envía precio incorrecto
+✅ **Mejor UX:** Usuario sabe inmediatamente si no hay stock
+✅ **Seguridad financiera:** Total calculado server-side
+
+---
+
+## Testing después del fix:
+
+```bash
+# Test 1: Compra normal (debería funcionar)
+curl -X POST http://localhost:3000/api/checkout \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items": [{"id": 1, "name": "Perfume A", "price": 15000, "quantity": 1}],
+    "customer_info": {"name": "Test", "email": "test@test.com"}
+  }'
+
+# Test 2: Precio manipulado (debería usar precio de DB y logear warning)
+curl -X POST http://localhost:3000/api/checkout \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items": [{"id": 1, "name": "Perfume A", "price": 0.01, "quantity": 1}],
+    "customer_info": {"name": "Test", "email": "test@test.com"}
+  }'
+# Esperado: Orden creada con precio real ($15000), no con $0.01
+
+# Test 3: Stock insuficiente (debería fallar)
+curl -X POST http://localhost:3000/api/checkout \
+  -H "Content-Type: application/json" \
+  -d '{
+    "items": [{"id": 1, "name": "Perfume A", "price": 15000, "quantity": 9999}],
+    "customer_info": {"name": "Test", "email": "test@test.com"}
+  }'
+# Esperado: Error 400 "Stock insuficiente"
+```

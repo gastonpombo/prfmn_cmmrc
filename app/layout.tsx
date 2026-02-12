@@ -7,6 +7,7 @@ import { Footer } from "@/components/layout/footer"
 import { CartSlideOver } from "@/components/layout/cart-slide-over"
 import { CartProvider } from "@/context/cart-context"
 import { SupabaseProvider } from "@/context/supabase-context"
+import { Toaster } from "@/components/ui/sonner"
 import { getSiteConfig } from "@/lib/supabase"
 
 import "./globals.css"
@@ -44,6 +45,7 @@ export default async function RootLayout({
               contactWhatsapp={siteConfig?.contact_whatsapp ?? null}
             />
             <CartSlideOver />
+            <Toaster position="bottom-right" richColors />
           </CartProvider>
         </SupabaseProvider>
       </body>

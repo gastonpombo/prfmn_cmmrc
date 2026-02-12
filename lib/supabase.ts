@@ -35,13 +35,44 @@ export function createBrowserClient(): SupabaseClient {
   return supabase
 }
 
+// Admin client with SERVICE_ROLE_KEY (bypasses RLS)
+// ⚠️ SOLO usar en server-side code (API routes, server actions)
+// NUNCA exponer el SERVICE_ROLE_KEY al cliente
+let supabaseAdmin: SupabaseClient | null = null
+
+export function getSupabaseAdminClient(): SupabaseClient {
+  if (supabaseAdmin) return supabaseAdmin
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error(
+      "Missing SUPABASE_SERVICE_ROLE_KEY. Admin client cannot be initialized."
+    )
+  }
+
+  supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
+
+  return supabaseAdmin
+}
+
+// ============================================
+// Database Types - Basados en esquema de Supabase
+// ============================================
+
 export type Product = {
-  id: number
-  name: string
-  price: number
-  image_url: string
-  category: number
-  stock: number
+  id: number // int8
+  name: string // text
+  price: number // numeric
+  stock: number // int4
+  image_url?: string | null
+  category?: number | null
   description?: string | null
   top_notes?: string | null
   heart_notes?: string | null
@@ -50,6 +81,8 @@ export type Product = {
   longevity?: string | null
   sillage?: string | null
   time_of_day?: string | null
+  created_at?: string
+  updated_at?: string
 }
 
 export type Category = {
@@ -59,12 +92,70 @@ export type Category = {
 }
 
 export type Order = {
+  id: number // int8
+  total_amount: number // numeric
+  status: string // text (ej: 'pending', 'completed', 'cancelled')
+  payment_id?: string | null // text
+  customer_details: CustomerDetails // jsonb
+  user_id?: string | null // uuid (null para usuarios anónimos)
+  created_at?: string
+  updated_at?: string
+}
+
+export type CustomerDetails = {
+  name: string
+  email: string
+  phone?: string
+  address?: {
+    street?: string
+    city?: string
+    state?: string
+    postal_code?: string
+    country?: string
+  }
+}
+
+export type OrderItem = {
+  id: number // int8
+  order_id: number // int8, FK -> orders
+  product_id: number // int8, FK -> products
+  quantity: number // int4
+  unit_price: number // numeric
+  created_at?: string
+}
+
+// Tipo extendido para mostrar items con info del producto
+export type OrderItemWithProduct = OrderItem & {
+  product?: Product
+}
+
+// Tipo extendido para mostrar órdenes con sus items
+export type OrderWithItems = Order & {
+  order_items?: OrderItemWithProduct[]
+}
+
+// ============================================
+// Tipos para Checkout y Carrito
+// ============================================
+
+export type CartItem = {
   id: number
-  customer_email: string
-  total: number
-  status: string
-  payment_id?: string | null
-  created_at: string
+  name: string
+  price: number
+  quantity: number
+  image_url?: string
+}
+
+export type CheckoutRequest = {
+  items: CartItem[]
+  customer_info: CustomerDetails
+}
+
+export type CheckoutResponse = {
+  success: boolean
+  order_id: number
+  init_point: string // URL de Mercado Pago
+  preference_id: string
 }
 
 export type SiteConfig = {

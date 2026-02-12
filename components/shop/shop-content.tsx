@@ -4,35 +4,24 @@ import { useState, useMemo, useEffect } from "react"
 import { useSearchParams, useRouter, usePathname } from "next/navigation"
 import type { Product, Category } from "@/lib/supabase"
 import { ProductCard } from "@/components/product-card"
-import { SlidersHorizontal, X } from "lucide-react"
-
-type PriceRange = "all" | "0-5000" | "5000-15000" | "15000-30000" | "30000+"
-
-const priceRanges: { value: PriceRange; label: string }[] = [
-  { value: "all", label: "Todos los precios" },
-  { value: "0-5000", label: "Hasta $5.000" },
-  { value: "5000-15000", label: "$5.000 - $15.000" },
-  { value: "15000-30000", label: "$15.000 - $30.000" },
-  { value: "30000+", label: "M\u00E1s de $30.000" },
-]
-
-const seasons = ["Primavera", "Verano", "Otoño", "Invierno", "Todo el año"]
-const timesOfDay = ["Día", "Noche", "Versátil"]
-
-function filterByPrice(product: Product, range: PriceRange): boolean {
-  switch (range) {
-    case "0-5000":
-      return product.price <= 5000
-    case "5000-15000":
-      return product.price > 5000 && product.price <= 15000
-    case "15000-30000":
-      return product.price > 15000 && product.price <= 30000
-    case "30000+":
-      return product.price > 30000
-    default:
-      return true
-  }
-}
+import { FilterSidebar } from "@/components/shop/filter-sidebar"
+import { SlidersHorizontal, Search, X } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 
 export function ShopContent({
   products,
@@ -44,383 +33,298 @@ export function ShopContent({
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
-  const searchQuery = searchParams.get("q") || ""
-  const initialCategory = searchParams.get("category")
 
-  const [selectedCategory, setSelectedCategory] = useState<string>(
-    initialCategory || "all"
-  )
-  const [priceRange, setPriceRange] = useState<PriceRange>("all")
+  // URL Params
+  const initialCategory = searchParams.get("category")
+  const initialSearch = searchParams.get("q") || ""
+  const initialSort = searchParams.get("sort") || "newest"
+
+  // State
+  const [searchQuery, setSearchQuery] = useState(initialSearch)
+  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory || "all")
   const [selectedSeasons, setSelectedSeasons] = useState<string[]>([])
   const [selectedTimes, setSelectedTimes] = useState<string[]>([])
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sortBy, setSortBy] = useState<string>(initialSort)
 
-  // Update URL with filters
+  // Calculate Max Price dynamically
+  const maxPrice = useMemo(() => {
+    return Math.max(...products.map((p) => p.price), 500000)
+  }, [products])
+
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, maxPrice])
+
+  // Debounced Search URL Update
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const params = new URLSearchParams(searchParams.toString())
+      if (searchQuery) {
+        params.set("q", searchQuery)
+      } else {
+        params.delete("q")
+      }
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [searchQuery, router, pathname, searchParams])
+
+  // Update URL for other filters
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString())
-    
-    if (selectedCategory !== "all") {
-      params.set("category", selectedCategory)
-    } else {
-      params.delete("category")
-    }
-    
-    if (priceRange !== "all") {
-      params.set("price", priceRange)
-    } else {
-      params.delete("price")
-    }
-    
-    if (selectedSeasons.length > 0) {
-      params.set("season", selectedSeasons.join(","))
-    } else {
-      params.delete("season")
-    }
-    
-    if (selectedTimes.length > 0) {
-      params.set("time", selectedTimes.join(","))
-    } else {
-      params.delete("time")
-    }
+
+    if (selectedCategory !== "all") params.set("category", selectedCategory)
+    else params.delete("category")
+
+    if (sortBy !== "newest") params.set("sort", sortBy)
+    else params.delete("sort")
 
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-  }, [selectedCategory, priceRange, selectedSeasons, selectedTimes, pathname, router, searchParams])
+  }, [selectedCategory, sortBy, pathname, router, searchParams])
 
-  const filtered = useMemo(() => {
+  // Filtering Logic
+  const filteredProducts = useMemo(() => {
     return products.filter((p) => {
-      // Search filter
+      // 1. Search
       if (searchQuery) {
-        const searchLower = searchQuery.toLowerCase()
-        const matchesName = p.name.toLowerCase().includes(searchLower)
-        const matchesDesc = p.description?.toLowerCase().includes(searchLower)
-        const matchesNotes =
-          p.top_notes?.toLowerCase().includes(searchLower) ||
-          p.heart_notes?.toLowerCase().includes(searchLower) ||
-          p.base_notes?.toLowerCase().includes(searchLower)
-        
-        if (!matchesName && !matchesDesc && !matchesNotes) return false
+        const query = searchQuery.toLowerCase()
+        const matchName = p.name.toLowerCase().includes(query)
+        const matchDesc = p.description?.toLowerCase().includes(query)
+        const matchNotes =
+          p.top_notes?.toLowerCase().includes(query) ||
+          p.heart_notes?.toLowerCase().includes(query) ||
+          p.base_notes?.toLowerCase().includes(query)
+
+        if (!matchName && !matchDesc && !matchNotes) return false
       }
 
-      // Category filter
-      const catMatch =
-        selectedCategory === "all" ||
-        p.category === Number(selectedCategory)
-      if (!catMatch) return false
+      // 2. Category
+      if (selectedCategory !== "all" && p.category !== Number(selectedCategory)) {
+        return false
+      }
 
-      // Price filter
-      const priceMatch = filterByPrice(p, priceRange)
-      if (!priceMatch) return false
+      // 3. Price
+      if (p.price < priceRange[0] || p.price > priceRange[1]) {
+        return false
+      }
 
-      // Season filter
+      // 4. Season
       if (selectedSeasons.length > 0) {
-        const productSeason = p.season?.toLowerCase()
-        const matchesSeason = selectedSeasons.some(
-          (s) => productSeason?.includes(s.toLowerCase())
-        )
-        if (!matchesSeason) return false
+        const pSeason = p.season?.toLowerCase()
+        if (!pSeason || !selectedSeasons.some(s => pSeason.includes(s.toLowerCase()))) {
+          return false
+        }
       }
 
-      // Time of day filter
+      // 5. Time of Day
       if (selectedTimes.length > 0) {
-        const productTime = p.time_of_day?.toLowerCase()
-        const matchesTime = selectedTimes.some(
-          (t) => productTime?.includes(t.toLowerCase())
-        )
-        if (!matchesTime) return false
+        const pTime = p.time_of_day?.toLowerCase()
+        if (!pTime || !selectedTimes.some(t => pTime.includes(t.toLowerCase()))) {
+          return false
+        }
       }
 
       return true
+    }).sort((a, b) => {
+      // Sorting
+      switch (sortBy) {
+        case "price-asc":
+          return a.price - b.price
+        case "price-desc":
+          return b.price - a.price
+        case "name-asc":
+          return a.name.localeCompare(b.name)
+        case "name-desc":
+          return b.name.localeCompare(a.name)
+        default: // newest (assuming higher ID is newer for now, or random if no date)
+          return b.id - a.id
+      }
     })
-  }, [products, searchQuery, selectedCategory, priceRange, selectedSeasons, selectedTimes])
+  }, [products, searchQuery, selectedCategory, priceRange, selectedSeasons, selectedTimes, sortBy])
 
-  const activeFilters =
-    selectedCategory !== "all" || 
-    priceRange !== "all" || 
-    selectedSeasons.length > 0 || 
-    selectedTimes.length > 0
+  const activeFiltersCount =
+    (selectedCategory !== "all" ? 1 : 0) +
+    (priceRange[0] > 0 || priceRange[1] < maxPrice ? 1 : 0) +
+    selectedSeasons.length +
+    selectedTimes.length
 
   return (
-    <div className="flex gap-10">
+    <div className="flex flex-col gap-8 lg:flex-row">
+      {/* Mobile Filter Sheet */}
+      <Sheet>
+        <SheetTrigger asChild>
+          <Button variant="outline" className="lg:hidden w-full flex items-center gap-2">
+            <SlidersHorizontal className="h-4 w-4" />
+            Filtros {activeFiltersCount > 0 && `(${activeFiltersCount})`}
+          </Button>
+        </SheetTrigger>
+        <SheetContent side="left" className="w-[300px] sm:w-[400px] overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle className="font-serif text-2xl text-primary">Filtros</SheetTitle>
+          </SheetHeader>
+          <div className="mt-8">
+            <FilterSidebar
+              categories={categories}
+              selectedCategory={selectedCategory}
+              setSelectedCategory={setSelectedCategory}
+              priceRange={priceRange}
+              setPriceRange={setPriceRange}
+              selectedSeasons={selectedSeasons}
+              setSelectedSeasons={setSelectedSeasons}
+              selectedTimes={selectedTimes}
+              setSelectedTimes={setSelectedTimes}
+              maxPrice={maxPrice}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
+
       {/* Desktop Sidebar */}
-      <aside className="hidden w-56 flex-shrink-0 lg:block">
-        <FilterPanel
-          categories={categories}
-          selectedCategory={selectedCategory}
-          setSelectedCategory={setSelectedCategory}
-          priceRange={priceRange}
-          setPriceRange={setPriceRange}
-          selectedSeasons={selectedSeasons}
-          setSelectedSeasons={setSelectedSeasons}
-          selectedTimes={selectedTimes}
-          setSelectedTimes={setSelectedTimes}
-        />
+      <aside className="hidden w-64 flex-shrink-0 lg:block">
+        <div className="sticky top-24">
+          <FilterSidebar
+            categories={categories}
+            selectedCategory={selectedCategory}
+            setSelectedCategory={setSelectedCategory}
+            priceRange={priceRange}
+            setPriceRange={setPriceRange}
+            selectedSeasons={selectedSeasons}
+            setSelectedSeasons={setSelectedSeasons}
+            selectedTimes={selectedTimes}
+            setSelectedTimes={setSelectedTimes}
+            maxPrice={maxPrice}
+          />
+        </div>
       </aside>
 
-      {/* Mobile Filter Toggle */}
+      {/* Main Content */}
       <div className="flex-1">
-        <div className="mb-6 flex items-center justify-between lg:hidden">
-          <button
-            type="button"
-            onClick={() => setSidebarOpen(true)}
-            className="flex items-center gap-2 rounded border border-border px-4 py-2 font-sans text-sm text-primary transition-colors hover:border-secondary"
-          >
-            <SlidersHorizontal className="h-4 w-4" />
-            Filtros
-          </button>
-          <span className="font-sans text-sm text-muted-foreground">
-            {filtered.length} {filtered.length === 1 ? "producto" : "productos"}
-          </span>
+        {/* Toolbar */}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Buscar perfumes..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-muted-foreground whitespace-nowrap">
+              {filteredProducts.length} resultados
+            </span>
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Ordenar por" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Más recientes</SelectItem>
+                <SelectItem value="price-asc">Precio: Menor a Mayor</SelectItem>
+                <SelectItem value="price-desc">Precio: Mayor a Menor</SelectItem>
+                <SelectItem value="name-asc">Nombre: A-Z</SelectItem>
+                <SelectItem value="name-desc">Nombre: Z-A</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
-        {/* Mobile Sidebar Overlay */}
-        {sidebarOpen && (
-          <>
-            <div
-              className="fixed inset-0 z-40 bg-primary/40 lg:hidden"
-              onClick={() => setSidebarOpen(false)}
-              aria-hidden="true"
-            />
-            <div className="fixed inset-y-0 left-0 z-50 w-72 bg-background p-6 shadow-2xl lg:hidden">
-              <div className="mb-6 flex items-center justify-between">
-                <h3 className="font-serif text-lg text-primary">Filtros</h3>
-                <button
-                  type="button"
-                  onClick={() => setSidebarOpen(false)}
-                  className="text-primary/50 hover:text-primary"
-                  aria-label="Cerrar filtros"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-              <FilterPanel
-                categories={categories}
-                selectedCategory={selectedCategory}
-                setSelectedCategory={(v) => {
-                  setSelectedCategory(v)
-                  setSidebarOpen(false)
-                }}
-                priceRange={priceRange}
-                setPriceRange={(v) => {
-                  setPriceRange(v)
-                  setSidebarOpen(false)
-                }}
-                selectedSeasons={selectedSeasons}
-                setSelectedSeasons={setSelectedSeasons}
-                selectedTimes={selectedTimes}
-                setSelectedTimes={setSelectedTimes}
-              />
-            </div>
-          </>
-        )}
-
-        {/* Active Filters */}
-        {activeFilters && (
-          <div className="mb-6 hidden items-center gap-2 lg:flex">
-            <span className="font-sans text-xs text-muted-foreground">
-              Filtros activos:
-            </span>
+        {/* Active Filters Bar (Desktop) */}
+        {activeFiltersCount > 0 && (
+          <div className="mb-6 flex flex-wrap gap-2">
             {selectedCategory !== "all" && (
-              <span className="flex items-center gap-1 rounded-full bg-muted px-3 py-1 font-sans text-xs text-primary">
-                {categories.find((c) => c.id === Number(selectedCategory))?.name}
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory("all")}
-                  aria-label="Quitar filtro de categor\u00EDa"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setSelectedCategory("all")}
+                className="h-7 text-xs"
+              >
+                Categoría: {categories.find(c => String(c.id) === selectedCategory)?.name}
+                <X className="ml-1 h-3 w-3" />
+              </Button>
             )}
-            {priceRange !== "all" && (
-              <span className="flex items-center gap-1 rounded-full bg-muted px-3 py-1 font-sans text-xs text-primary">
-                {priceRanges.find((r) => r.value === priceRange)?.label}
-                <button
-                  type="button"
-                  onClick={() => setPriceRange("all")}
-                  aria-label="Quitar filtro de precio"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
+            {(priceRange[0] > 0 || priceRange[1] < maxPrice) && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setPriceRange([0, maxPrice])}
+                className="h-7 text-xs"
+              >
+                Precio: ${priceRange[0]} - ${priceRange[1]}
+                <X className="ml-1 h-3 w-3" />
+              </Button>
             )}
+            {selectedSeasons.map(s => (
+              <Button
+                key={s}
+                variant="secondary"
+                size="sm"
+                onClick={() => setSelectedSeasons(selectedSeasons.filter(item => item !== s))}
+                className="h-7 text-xs"
+              >
+                {s}
+                <X className="ml-1 h-3 w-3" />
+              </Button>
+            ))}
+            {selectedTimes.map(t => (
+              <Button
+                key={t}
+                variant="secondary"
+                size="sm"
+                onClick={() => setSelectedTimes(selectedTimes.filter(item => item !== t))}
+                className="h-7 text-xs"
+              >
+                {t}
+                <X className="ml-1 h-3 w-3" />
+              </Button>
+            ))}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedCategory("all")
+                setPriceRange([0, maxPrice])
+                setSelectedSeasons([])
+                setSelectedTimes([])
+                setSearchQuery("")
+              }}
+              className="h-7 text-xs text-muted-foreground hover:text-destructive"
+            >
+              Limpiar todo
+            </Button>
           </div>
         )}
 
-        {/* Products Grid */}
-        {filtered.length > 0 ? (
-          <div className="grid grid-cols-2 gap-6 md:grid-cols-3">
-            {filtered.map((product, index) => (
-              <ProductCard key={product.id} product={product} priority={index < 6} />
+        {/* Product Grid */}
+        {filteredProducts.length > 0 ? (
+          <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 xl:grid-cols-4">
+            {filteredProducts.map((product, index) => (
+              <ProductCard key={product.id} product={product} priority={index < 8} />
             ))}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <p className="font-sans text-sm text-muted-foreground">
-              No se encontraron productos con los filtros seleccionados.
+          <div className="flex flex-col items-center justify-center py-20 text-center border rounded-lg bg-muted/10">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted">
+              <Search className="h-10 w-10 text-muted-foreground" />
+            </div>
+            <h3 className="mt-4 font-serif text-xl font-medium text-primary">No se encontraron resultados</h3>
+            <p className="mt-2 text-sm text-muted-foreground max-w-sm">
+              Intentá ajustar tus filtros o buscar con otros términos.
             </p>
-            <button
-              type="button"
+            <Button
+              variant="link"
               onClick={() => {
                 setSelectedCategory("all")
-                setPriceRange("all")
+                setPriceRange([0, maxPrice])
+                setSelectedSeasons([])
+                setSelectedTimes([])
+                setSearchQuery("")
               }}
-              className="mt-4 font-sans text-sm text-secondary underline"
+              className="mt-4 text-secondary"
             >
-              Limpiar filtros
-            </button>
+              Limpiar todos los filtros
+            </Button>
           </div>
         )}
-      </div>
-    </div>
-  )
-}
-
-function FilterPanel({
-  categories,
-  selectedCategory,
-  setSelectedCategory,
-  priceRange,
-  setPriceRange,
-  selectedSeasons,
-  setSelectedSeasons,
-  selectedTimes,
-  setSelectedTimes,
-}: {
-  categories: Category[]
-  selectedCategory: string
-  setSelectedCategory: (v: string) => void
-  priceRange: PriceRange
-  setPriceRange: (v: PriceRange) => void
-  selectedSeasons: string[]
-  setSelectedSeasons: (v: string[]) => void
-  selectedTimes: string[]
-  setSelectedTimes: (v: string[]) => void
-}) {
-  const toggleSeason = (season: string) => {
-    if (selectedSeasons.includes(season)) {
-      setSelectedSeasons(selectedSeasons.filter((s) => s !== season))
-    } else {
-      setSelectedSeasons([...selectedSeasons, season])
-    }
-  }
-
-  const toggleTime = (time: string) => {
-    if (selectedTimes.includes(time)) {
-      setSelectedTimes(selectedTimes.filter((t) => t !== time))
-    } else {
-      setSelectedTimes([...selectedTimes, time])
-    }
-  }
-
-  return (
-    <div className="flex flex-col gap-8">
-      {/* Categories */}
-      <div>
-        <h4 className="mb-4 font-serif text-sm uppercase tracking-widest text-primary">
-          Categor&iacute;a
-        </h4>
-        <ul className="flex flex-col gap-2">
-          <li>
-            <button
-              type="button"
-              onClick={() => setSelectedCategory("all")}
-              className={`font-sans text-sm transition-colors ${
-                selectedCategory === "all"
-                  ? "font-semibold text-secondary"
-                  : "text-muted-foreground hover:text-primary"
-              }`}
-            >
-              Todas
-            </button>
-          </li>
-          {categories.map((cat) => (
-            <li key={cat.id}>
-              <button
-                type="button"
-                onClick={() => setSelectedCategory(String(cat.id))}
-                className={`font-sans text-sm transition-colors ${
-                  selectedCategory === String(cat.id)
-                    ? "font-semibold text-secondary"
-                    : "text-muted-foreground hover:text-primary"
-                }`}
-              >
-                {cat.name}
-              </button>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Season */}
-      <div>
-        <h4 className="mb-4 font-serif text-sm uppercase tracking-widest text-primary">
-          Estación
-        </h4>
-        <ul className="flex flex-col gap-2">
-          {seasons.map((season) => (
-            <li key={season}>
-              <label className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={selectedSeasons.includes(season)}
-                  onChange={() => toggleSeason(season)}
-                  className="h-4 w-4 border-border bg-background accent-secondary"
-                />
-                <span className="font-sans text-sm text-muted-foreground">
-                  {season}
-                </span>
-              </label>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Time of Day */}
-      <div>
-        <h4 className="mb-4 font-serif text-sm uppercase tracking-widest text-primary">
-          Momento
-        </h4>
-        <ul className="flex flex-col gap-2">
-          {timesOfDay.map((time) => (
-            <li key={time}>
-              <label className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={selectedTimes.includes(time)}
-                  onChange={() => toggleTime(time)}
-                  className="h-4 w-4 border-border bg-background accent-secondary"
-                />
-                <span className="font-sans text-sm text-muted-foreground">
-                  {time}
-                </span>
-              </label>
-            </li>
-          ))}
-        </ul>
-      </div>
-
-      {/* Price */}
-      <div>
-        <h4 className="mb-4 font-serif text-sm uppercase tracking-widest text-primary">
-          Precio
-        </h4>
-        <ul className="flex-col gap-2">
-          {priceRanges.map((range) => (
-            <li key={range.value}>
-              <button
-                type="button"
-                onClick={() => setPriceRange(range.value)}
-                className={`font-sans text-sm transition-colors ${
-                  priceRange === range.value
-                    ? "font-semibold text-secondary"
-                    : "text-muted-foreground hover:text-primary"
-                }`}
-              >
-                {range.label}
-              </button>
-            </li>
-          ))}
-        </ul>
       </div>
     </div>
   )
