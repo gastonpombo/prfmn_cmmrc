@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { Clock, Mail, FileText } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import '../checkout.css'
 
 export default function CheckoutPendingPage() {
   return (
@@ -100,24 +101,6 @@ export default function CheckoutPendingPage() {
           </Link>
         </p>
       </div>
-
-      {/* CSS para animación de pulso lento */}
-      <style jsx>{`
-        @keyframes pulse-slow {
-          0%, 100% {
-            opacity: 1;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.8;
-            transform: scale(1.05);
-          }
-        }
-
-        .animate-pulse-slow {
-          animation: pulse-slow 2s ease-in-out infinite;
-        }
-      `}</style>
     </div>
   )
 }

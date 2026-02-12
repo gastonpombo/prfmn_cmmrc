@@ -4,11 +4,12 @@ import Link from 'next/link'
 import { CheckCircle2, ShoppingBag, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import '../checkout.css'
 
 export default function CheckoutSuccessPage() {
   return (
     <div className="container max-w-2xl py-20">
-      {/* Animación de confeti (CSS puro) */}
+      {/* Animación de confeti */}
       <div className="confetti-wrapper">
         {Array.from({ length: 50 }).map((_, i) => (
           <div
@@ -100,58 +101,6 @@ export default function CheckoutSuccessPage() {
           </Link>
         </p>
       </div>
-
-      {/* CSS para confeti */}
-      <style jsx>{`
-        .confetti-wrapper {
-          position: fixed;
-          top: 0;
-          left: 0;
-          width: 100%;
-          height: 100%;
-          pointer-events: none;
-          z-index: 50;
-          overflow: hidden;
-        }
-
-        .confetti {
-          position: absolute;
-          width: 10px;
-          height: 10px;
-          top: -10px;
-          opacity: 0;
-          animation: confetti-fall 3s linear forwards;
-        }
-
-        @keyframes confetti-fall {
-          0% {
-            transform: translateY(0) rotateZ(0deg);
-            opacity: 1;
-          }
-          100% {
-            transform: translateY(100vh) rotateZ(360deg);
-            opacity: 0;
-          }
-        }
-
-        @keyframes bounce-in {
-          0% {
-            transform: scale(0);
-            opacity: 0;
-          }
-          50% {
-            transform: scale(1.1);
-          }
-          100% {
-            transform: scale(1);
-            opacity: 1;
-          }
-        }
-
-        .animate-bounce-in {
-          animation: bounce-in 0.6s ease-out;
-        }
-      `}</style>
     </div>
   )
 }
