@@ -1,3 +1,5 @@
+"use client"
+
 import Link from 'next/link'
 import { XCircle, RefreshCw, HelpCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
