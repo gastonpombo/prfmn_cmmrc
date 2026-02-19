@@ -1,17 +1,20 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { getProductById, getSiteConfig, getRelatedProducts, getSupabaseClient } from "@/lib/supabase"
+import { getProductById, getRelatedProducts } from "@/lib/supabase"
 import { AddToCartButton } from "@/components/product/add-to-cart-button"
-import { OlfactoryPyramid } from "@/components/product/olfactory-pyramid"
-import { IntensityScale } from "@/components/product/intensity-scale"
 import { RelatedProducts } from "@/components/product/related-products"
 import { ProductGallery } from "@/components/product/product-gallery"
-import { StickyAddToCart } from "@/components/product/sticky-add-to-cart"
+import { ProductActionBar } from "@/components/product/product-action-bar"
 import { RecentlyViewed } from "@/components/product/recently-viewed"
-import { Clock, Star, ShieldCheck, Truck } from "lucide-react"
+import { Clock, ShieldCheck, Truck, Sparkles } from "lucide-react"
 import { NotePills } from "@/components/product/note-pills"
-import type { Category } from "@/lib/supabase"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { IntensityScale } from "@/components/product/intensity-scale"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 
 interface ProductPageProps {
   params: Promise<{ id: string }>
@@ -20,7 +23,6 @@ interface ProductPageProps {
 export default async function ProductPage({ params }: ProductPageProps) {
   const { id } = await params
   const product = await getProductById(Number(id))
-  const siteConfig = await getSiteConfig()
 
   if (!product) {
     notFound()
@@ -28,13 +30,7 @@ export default async function ProductPage({ params }: ProductPageProps) {
 
   const relatedProducts = product.category ? await getRelatedProducts(product.category, product.id, 4) : []
 
-  // Fetch all categories for sidebar
-  const supabase = getSupabaseClient()
-  const { data: categories } = await supabase
-    .from("categories")
-    .select("*")
-    .order("name")
-
+  // Helper for season icon
   const getSeasonIcon = (season: string | undefined) => {
     if (!season) return null
     const seasonLower = season.toLowerCase()
@@ -46,233 +42,164 @@ export default async function ProductPage({ params }: ProductPageProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20">
-      <div className="mx-auto max-w-7xl px-4 py-8 lg:py-12">
-        {/* Breadcrumb */}
-        <nav className="mb-8 flex items-center gap-2 text-sm overflow-x-auto whitespace-nowrap pb-2">
-          <Link
-            href="/"
-            className="text-muted-foreground transition-colors hover:text-secondary"
-          >
-            Inicio
-          </Link>
-          <span className="text-muted-foreground">/</span>
-          <Link
-            href="/shop"
-            className="text-muted-foreground transition-colors hover:text-secondary"
-          >
-            Catálogo
-          </Link>
-          <span className="text-muted-foreground">/</span>
-          <span className="text-foreground font-medium">{product.name}</span>
-        </nav>
+    <div className="min-h-screen bg-background pb-40 md:pb-20">
 
-        {/* Main Grid Layout */}
-        <div className="grid gap-12 lg:grid-cols-[280px_1fr_1fr]">
-          {/* Left Sidebar - Filters (Desktop Only) */}
-          <aside className="hidden h-fit lg:block">
-            <div className="sticky top-24 space-y-8 rounded-lg border border-border bg-card/30 p-6">
-              <div>
-                <h3 className="mb-4 font-serif text-sm uppercase tracking-widest text-secondary">
-                  Categorías
-                </h3>
-                <div className="space-y-2">
-                  <Link
-                    href="/shop"
-                    className="block font-sans text-sm text-muted-foreground transition-colors hover:text-secondary"
-                  >
-                    Ver Todas
-                  </Link>
-                  {categories && categories.length > 0 && (
-                    <>
-                      {(categories as Category[]).map((cat) => (
-                        <Link
-                          key={cat.id}
-                          href={`/shop?category=${cat.id}`}
-                          className={`block font-sans text-sm transition-colors ${product.category === cat.id
-                            ? "font-semibold text-secondary"
-                            : "text-muted-foreground hover:text-secondary"
-                            }`}
-                        >
-                          {cat.name}
-                        </Link>
-                      ))}
-                    </>
-                  )}
-                </div>
-              </div>
+      {/* ── Main Layout ── */}
+      <div className="md:mx-auto md:max-w-7xl md:grid md:grid-cols-2 md:gap-12 md:px-6 md:py-12">
+
+        {/* ── Left Column: Image (Sticky on Desktop) ── */}
+        <div className="relative">
+          {/* Desktop Sticky Container */}
+          <div className="md:sticky md:top-24 md:h-[calc(100vh-8rem)]">
+            {/* 
+                  Mobile: Immersive 55vh, Rounded Bottom 3xl (1.5rem)
+                  Desktop: Full height, Rounded 2xl 
+                */}
+            <div className="relative h-[55vh] w-full overflow-hidden rounded-b-3xl shadow-lg md:h-full md:rounded-2xl">
+              <ProductGallery
+                images={[product.image_url || "/placeholder.svg"]}
+                name={product.name}
+              />
             </div>
-          </aside>
+          </div>
+        </div>
 
-          {/* Main Content */}
-          <div className="space-y-16 lg:col-span-2">
-            {/* Hero Section */}
-            <div className="grid gap-8 md:grid-cols-2">
-              {/* Product Gallery */}
-              <div className="flex flex-col">
-                <ProductGallery
-                  images={[product.image_url || "/placeholder.svg"]}
-                  name={product.name}
-                />
-              </div>
+        {/* ── Right Column: Details ── */}
+        <div className="md:px-0 md:py-0">
 
-              {/* Product Info */}
-              <div className="flex flex-col justify-center">
-                <div className="space-y-6">
-                  <div>
-                    <h1 className="font-serif text-4xl font-light tracking-tight text-primary md:text-5xl lg:text-6xl">
-                      {product.name}
-                    </h1>
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className="flex text-secondary">
-                        <Star className="h-4 w-4 fill-current" />
-                        <Star className="h-4 w-4 fill-current" />
-                        <Star className="h-4 w-4 fill-current" />
-                        <Star className="h-4 w-4 fill-current" />
-                        <Star className="h-4 w-4 fill-current" />
-                      </div>
-                      <span className="text-xs text-muted-foreground">(5.0)</span>
-                    </div>
-                  </div>
+          {/* Breadcrumb (Desktop Only) */}
+          <nav className="mb-6 hidden items-center gap-2 text-xs md:flex">
+            <Link href="/" className="text-muted-foreground hover:text-secondary">Inicio</Link>
+            <span className="text-muted-foreground">/</span>
+            <Link href="/shop" className="text-muted-foreground hover:text-secondary">Catálogo</Link>
+            <span className="text-muted-foreground">/</span>
+            <span className="font-medium text-foreground">{product.name}</span>
+          </nav>
 
-                  {/* Price */}
-                  <div className="space-y-2">
-                    <p className="font-serif text-4xl font-light text-secondary">
-                      ${product.price.toLocaleString("es-AR")}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      3 cuotas sin interés de ${(product.price / 3).toLocaleString("es-AR", { maximumFractionDigits: 2 })}
-                    </p>
-                  </div>
+          {/* Mobile Content Container */}
+          <div className="px-6 pt-8">
 
-                  {/* Stock Status */}
-                  <div>
-                    {product.stock <= 0 ? (
-                      <div className="inline-block border border-destructive px-4 py-2">
-                        <span className="font-sans text-xs uppercase tracking-[0.15em] text-destructive">
-                          Agotado
-                        </span>
-                      </div>
+            {/* Brand / Collection */}
+            <p className="mb-3 font-sans text-xs uppercase tracking-[0.25em] text-secondary">
+              PerfuMan Exclusive
+            </p>
+
+            {/* Title */}
+            <h1 className="mb-2 font-serif text-4xl font-medium tracking-tight text-primary md:text-5xl">
+              {product.name}
+            </h1>
+
+            {/* Price */}
+            <p className="mb-6 font-serif text-2xl text-muted-foreground md:text-3xl">
+              ${product.price.toLocaleString("es-AR")}
+            </p>
+
+            {/* Description (Short) */}
+            <div className="mb-10 prose prose-neutral prose-sm leading-relaxed text-muted-foreground/90">
+              <p>{product.description || "Una fragancia sofisticada que deja una impresión duradera. Notas seleccionadas para momentos inolvidables."}</p>
+            </div>
+
+            {/* Desktop Add to Cart (Hidden on Mobile) */}
+            <div className="mb-10 hidden md:block">
+              <AddToCartButton product={product} />
+            </div>
+
+            {/* ── Accordions (Shadcn) - Minimalist ── */}
+            <Accordion type="single" collapsible className="w-full border-t border-white/10">
+
+              {/* 1. Notas Olfativas */}
+              <AccordionItem value="notes" className="border-white/10">
+                <AccordionTrigger className="font-serif text-lg text-primary hover:text-secondary hover:no-underline">
+                  Notas Olfativas
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="pt-4 pb-6">
+                    {(product.top_notes || product.heart_notes || product.base_notes) ? (
+                      <NotePills
+                        topNotes={product.top_notes}
+                        heartNotes={product.heart_notes}
+                        baseNotes={product.base_notes}
+                      />
                     ) : (
-                      <div className="inline-block rounded-full bg-secondary/10 px-4 py-1">
-                        <span className="font-sans text-xs font-medium text-secondary">
-                          Disponible - {product.stock} unidades
-                        </span>
+                      <p className="text-muted-foreground italic">Consultar al asesor.</p>
+                    )}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* 2. Detalles e Ingredientes */}
+              <AccordionItem value="details" className="border-white/10">
+                <AccordionTrigger className="font-serif text-lg text-primary hover:text-secondary hover:no-underline">
+                  Detalles e Ingredientes
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-6 pt-4 pb-6">
+                    <div className="grid gap-6">
+                      <IntensityScale value={product.longevity} label="Longevidad" />
+                      <IntensityScale value={product.sillage} label="Estela" />
+                    </div>
+                    {product.time_of_day && (
+                      <div className="flex items-center gap-3 rounded-lg border border-white/5 bg-white/5 p-4">
+                        <Clock className="h-5 w-5 text-secondary" />
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Uso Recomendado</p>
+                          <p className="font-medium capitalize text-foreground">{product.time_of_day}</p>
+                        </div>
                       </div>
                     )}
                   </div>
+                </AccordionContent>
+              </AccordionItem>
 
-                  {/* Add to Cart Button */}
-                  <div className="pt-4">
-                    <AddToCartButton product={product} />
-                  </div>
-
-                  {/* Trust Badges */}
-                  <div className="flex items-center gap-6 border-y border-border py-4 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <Truck className="h-4 w-4" />
-                      <span>Envío Gratis &gt; $50.000</span>
+              {/* 3. Envío y Devoluciones */}
+              <AccordionItem value="shipping" className="border-white/10">
+                <AccordionTrigger className="font-serif text-lg text-primary hover:text-secondary hover:no-underline">
+                  Envío y Devoluciones
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-4 pt-4 pb-6 font-sans text-sm text-muted-foreground">
+                    <div className="flex items-start gap-4">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary/10 text-secondary">
+                        <Truck className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="mb-1 font-medium text-foreground">Envío Express</p>
+                        <p className="leading-relaxed">Despachamos tu pedido en menos de 24hs. Envío gratis a partir de $50.000.</p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <ShieldCheck className="h-4 w-4" />
-                      <span>Garantía de Autenticidad</span>
-                    </div>
-                  </div>
-
-                  {/* Quick Specs */}
-                  <div className="space-y-3">
-                    <p className="font-sans text-xs uppercase tracking-widest text-muted-foreground">
-                      Características
-                    </p>
-                    <div className="flex flex-wrap gap-3">
-                      {product.season && (
-                        <div className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm">
-                          <span className="text-lg">{getSeasonIcon(product.season)}</span>
-                          <span className="font-sans text-xs text-foreground capitalize">
-                            {product.season}
-                          </span>
-                        </div>
-                      )}
-                      {product.time_of_day && (
-                        <div className="flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm">
-                          <Clock className="h-4 w-4 text-secondary" />
-                          <span className="font-sans text-xs text-foreground capitalize">
-                            {product.time_of_day}
-                          </span>
-                        </div>
-                      )}
+                    <div className="flex items-start gap-4">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary/10 text-secondary">
+                        <ShieldCheck className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="mb-1 font-medium text-foreground">Garantía de Satisfacción</p>
+                        <p className="leading-relaxed">Tu satisfacción es nuestra prioridad. Si tenés algún inconveniente, contactanos.</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            </div>
+                </AccordionContent>
+              </AccordionItem>
 
-            {/* Product Details Tabs */}
-            <Tabs defaultValue="description" className="w-full">
-              <TabsList className="w-full justify-start border-b border-border bg-transparent p-0">
-                <TabsTrigger
-                  value="description"
-                  className="rounded-none border-b-2 border-transparent px-8 py-4 font-serif text-lg text-muted-foreground data-[state=active]:border-secondary data-[state=active]:text-secondary data-[state=active]:shadow-none"
-                >
-                  Descripción
-                </TabsTrigger>
-                <TabsTrigger
-                  value="notes"
-                  className="rounded-none border-b-2 border-transparent px-8 py-4 font-serif text-lg text-muted-foreground data-[state=active]:border-secondary data-[state=active]:text-secondary data-[state=active]:shadow-none"
-                >
-                  Notas Olfativas
-                </TabsTrigger>
-                <TabsTrigger
-                  value="performance"
-                  className="rounded-none border-b-2 border-transparent px-8 py-4 font-serif text-lg text-muted-foreground data-[state=active]:border-secondary data-[state=active]:text-secondary data-[state=active]:shadow-none"
-                >
-                  Rendimiento
-                </TabsTrigger>
-              </TabsList>
+            </Accordion>
 
-              <TabsContent value="description" className="py-8">
-                <div className="prose prose-neutral max-w-none">
-                  <p className="font-sans text-base leading-relaxed text-muted-foreground">
-                    {product.description || "Sin descripción disponible."}
-                  </p>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="notes" className="py-8">
-                {(product.top_notes || product.heart_notes || product.base_notes) ? (
-                  <div className="max-w-2xl">
-                    <NotePills
-                      topNotes={product.top_notes}
-                      heartNotes={product.heart_notes}
-                      baseNotes={product.base_notes}
-                    />
-                  </div>
-                ) : (
-                  <p className="text-muted-foreground">Información no disponible.</p>
-                )}
-              </TabsContent>
-
-              <TabsContent value="performance" className="py-8">
-                <div className="grid gap-8 sm:grid-cols-2 max-w-2xl">
-                  <IntensityScale value={product.longevity} label="Longevidad" />
-                  <IntensityScale value={product.sillage} label="Estela" />
-                </div>
-              </TabsContent>
-            </Tabs>
-
-            {/* Recently Viewed */}
-            <RecentlyViewed currentProduct={product} />
-
-            {/* Related Products Section */}
+            {/* Related Products */}
             {relatedProducts.length > 0 && (
-              <div className="border-t border-border pt-16">
+              <div className="mt-16 pt-10">
+                <h3 className="mb-6 font-serif text-2xl text-primary">También te podría gustar</h3>
                 <RelatedProducts products={relatedProducts} />
               </div>
             )}
+
+            {/* Recently Viewed */}
+            <div className="mt-10">
+              <RecentlyViewed currentProduct={product} />
+            </div>
           </div>
         </div>
       </div>
-      <StickyAddToCart product={product} />
+
+      {/* ── Mobile Sticky Action Bar ── */}
+      <ProductActionBar product={product} />
     </div>
   )
 }

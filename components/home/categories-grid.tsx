@@ -33,12 +33,12 @@ export async function CategoriesGrid() {
             Nuestras Categor&iacute;as
           </h2>
         </div>
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-6 scrollbar-none md:grid md:grid-cols-3 md:gap-6 md:pb-0 lg:grid-cols-4">
           {categories.map((cat) => (
             <Link
               key={cat.id}
               href={`/shop?category=${cat.id}`}
-              className="group relative flex h-64 items-end overflow-hidden rounded"
+              className="group relative flex h-80 min-w-[70%] shrink-0 snap-center items-end overflow-hidden rounded-lg bg-gray-100 sm:min-w-[45%] md:h-80 md:min-w-0 transition-transform hover:scale-[1.02] duration-500"
             >
               {cat.image_url ? (
                 <Image
@@ -50,9 +50,9 @@ export async function CategoriesGrid() {
               ) : (
                 <div className="absolute inset-0 bg-muted" />
               )}
-              <div className="absolute inset-0 bg-primary/30 transition-colors group-hover:bg-primary/40" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent transition-colors group-hover:from-black/70" />
               <div className="relative z-10 p-6">
-                <h3 className="font-serif text-xl text-primary-foreground">
+                <h3 className="font-serif text-xl text-white">
                   {cat.name}
                 </h3>
               </div>

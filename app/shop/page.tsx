@@ -1,12 +1,28 @@
 import { getSupabaseClient, type Product, type Category } from "@/lib/supabase"
 import { ShopContent } from "@/components/shop/shop-content"
 
-async function getProducts(): Promise<Product[]> {
+async function getProducts(searchParams?: { marca?: string; q?: string; category?: string }): Promise<Product[]> {
   const supabase = getSupabaseClient()
-  const { data, error } = await supabase
+  let query = supabase
     .from("products")
     .select("*")
     .order("name")
+
+  if (searchParams?.marca) {
+    query = query.eq("brand", searchParams.marca) // Assuming 'brand' column
+  }
+
+  if (searchParams?.category) {
+    query = query.eq("category", searchParams.category)
+  }
+
+  // Basic search if needed (though ShopContent usually handles client-side, 
+  // server-side filter is better for initial load if URL has params)
+  if (searchParams?.q) {
+    query = query.ilike('name', `%${searchParams.q}%`)
+  }
+
+  const { data, error } = await query
   if (error) {
     console.error("Error fetching products:", error)
     return []
@@ -35,9 +51,17 @@ export const metadata = {
 export const dynamic = "force-dynamic"
 
 
-export default async function ShopPage() {
+export default async function ShopPage({
+  searchParams,
+}: {
+  searchParams?: { [key: string]: string | string[] | undefined }
+}) {
+  const marca = typeof searchParams?.marca === 'string' ? searchParams.marca : undefined
+  const q = typeof searchParams?.q === 'string' ? searchParams.q : undefined
+  const category = typeof searchParams?.category === 'string' ? searchParams.category : undefined
+
   const [products, categories] = await Promise.all([
-    getProducts(),
+    getProducts({ marca, q, category }),
     getCategories(),
   ])
 

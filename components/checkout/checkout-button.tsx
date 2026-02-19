@@ -88,11 +88,6 @@ export function CheckoutButton({
         phone: '',
       }
 
-      console.log('🛒 Enviando checkout:', {
-        items_count: checkoutItems.length,
-        customer: customer.name,
-      })
-
       // 4. Hacer POST a la API de checkout
       const response = await fetch('/api/checkout', {
         method: 'POST',
@@ -106,11 +101,6 @@ export function CheckoutButton({
       })
 
       const data: CheckoutResponse = await response.json()
-
-      console.log('📦 Respuesta del servidor:', {
-        success: data.success,
-        error: data.error,
-      })
 
       // 5. Manejar respuesta de error
       if (!response.ok || !data.success) {

@@ -1,5 +1,6 @@
 import { getSupabaseClient, type Product } from "@/lib/supabase"
 import { FeaturedCarousel } from "./featured-carousel"
+import { ProductCard } from "@/components/product-card"
 
 async function getFeaturedProducts(): Promise<Product[]> {
   const supabase = getSupabaseClient()
@@ -34,7 +35,18 @@ export async function FeaturedProducts() {
             Novedades
           </h2>
         </div>
-        <FeaturedCarousel products={products} />
+
+        {/* Mobile Carousel */}
+        <div className="md:hidden">
+          <FeaturedCarousel products={products} />
+        </div>
+
+        {/* Desktop Grid */}
+        <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-4 gap-8">
+          {products.map((product, index) => (
+            <ProductCard key={product.id} product={product} index={index} />
+          ))}
+        </div>
       </div>
     </section>
   )

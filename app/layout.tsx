@@ -4,6 +4,7 @@ import { Inter, Playfair_Display } from "next/font/google"
 import { TopBar } from "@/components/layout/top-bar"
 import { Navbar } from "@/components/layout/navbar"
 import { Footer } from "@/components/layout/footer"
+import { MobileNav } from "@/components/layout/mobile-nav"
 import { CartSlideOver } from "@/components/layout/cart-slide-over"
 import { CartProvider } from "@/context/cart-context"
 import { SupabaseProvider } from "@/context/supabase-context"
@@ -44,6 +45,7 @@ export default async function RootLayout({
               contactEmail={siteConfig?.contact_email ?? null}
               contactWhatsapp={siteConfig?.contact_whatsapp ?? null}
             />
+            <MobileNav />
             <CartSlideOver />
             <Toaster position="bottom-right" richColors />
           </CartProvider>

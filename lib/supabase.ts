@@ -74,6 +74,7 @@ export type Product = {
   image_url?: string | null
   category?: number | null
   description?: string | null
+  brand?: string | null
   top_notes?: string | null
   heart_notes?: string | null
   base_notes?: string | null
@@ -225,4 +226,47 @@ export async function getSiteConfig(): Promise<SiteConfig | null> {
   }
 
   return data as SiteConfig
+}
+export type StoreSettings = {
+  id: number
+  hero_img_mobile: string
+  hero_img_desktop: string
+  hero_overlay_opacity: number // 0-100
+}
+
+export type Brand = {
+  id: number
+  name: string
+  logo_url: string | null
+  is_featured: boolean
+}
+
+export async function getStoreSettings(): Promise<StoreSettings | null> {
+  const { data, error } = await getSupabaseClient()
+    .from("store_settings")
+    .select("*")
+    .eq("id", 1)
+    .single()
+
+  if (error) {
+    console.error("Error fetching store_settings:", error.message)
+    return null
+  }
+
+  return data as StoreSettings
+}
+
+export async function getFeaturedBrands(): Promise<Brand[]> {
+  const { data, error } = await getSupabaseClient()
+    .from("brands")
+    .select("*")
+    .eq("is_featured", true)
+    .order("name")
+
+  if (error) {
+    console.error("Error fetching featured brands:", error.message)
+    return []
+  }
+
+  return (data || []) as Brand[]
 }

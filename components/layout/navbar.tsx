@@ -20,12 +20,20 @@ const navLinks = [
 export function Navbar() {
   const { openCart, totalItems } = useCart()
   const supabase = useSupabase()
-  const [mobileOpen, setMobileOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20)
+    }
+    window.addEventListener("scroll", handleScroll)
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -57,7 +65,12 @@ export function Navbar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/20 bg-background/92 backdrop-blur-md supports-[backdrop-filter]:bg-background/88">
+    <header
+      className={`sticky top-0 z-50 w-full border-b transition-all duration-500 ${scrolled
+        ? "border-white/10 bg-background/90 backdrop-blur-md shadow-sm"
+        : "border-transparent bg-transparent"
+        }`}
+    >
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5">
         {/* Logo */}
         <Link href="/" className="font-serif text-xl tracking-[0.1em] text-primary transition-colors duration-300 hover:text-secondary">
@@ -172,36 +185,13 @@ export function Navbar() {
             )}
           </button>
 
-          {/* Mobile Menu */}
-          <button
-            type="button"
-            onClick={() => setMobileOpen(!mobileOpen)}
-            className="text-primary/60 transition-all duration-300 hover:text-secondary md:hidden"
-            aria-label="Menu"
-          >
-            {mobileOpen ? <X className="h-[18px] w-[18px]" /> : <Menu className="h-[18px] w-[18px]" />}
-          </button>
+          {/* Mobile Menu Button - Removed in favor of Bottom Nav */}
+          {/* <button ... /> */}
         </div>
       </nav>
 
-      {/* Mobile Nav */}
-      {mobileOpen && (
-        <div className="border-t border-border/20 bg-background md:hidden">
-          <ul className="flex flex-col items-center gap-6 py-8">
-            {navLinks.map((link) => (
-              <li key={link.href}>
-                <Link
-                  href={link.href}
-                  onClick={() => setMobileOpen(false)}
-                  className="text-[11px] font-medium uppercase tracking-[0.15em] text-primary/60 transition-all duration-300 hover:text-secondary"
-                >
-                  {link.label}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {/* Mobile Nav - Removed in favor of Bottom Nav */}
+      {/* {mobileOpen && ( ... )} */}
     </header>
   )
 }

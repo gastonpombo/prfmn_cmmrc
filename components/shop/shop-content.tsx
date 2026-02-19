@@ -15,6 +15,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import { cn } from "@/lib/utils"
 import {
   Select,
   SelectContent,
@@ -164,39 +165,83 @@ export function ShopContent({
     selectedSeasons.length +
     selectedTimes.length
 
-  return (
-    <div className="flex flex-col gap-8 lg:flex-row">
-      {/* Mobile Filter Sheet */}
-      <Sheet>
-        <SheetTrigger asChild>
-          <Button variant="outline" className="lg:hidden w-full flex items-center gap-2">
-            <SlidersHorizontal className="h-4 w-4" />
-            Filtros {activeFiltersCount > 0 && `(${activeFiltersCount})`}
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="w-[300px] sm:w-[400px] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle className="font-serif text-2xl text-primary">Filtros</SheetTitle>
-          </SheetHeader>
-          <div className="mt-8">
-            <FilterSidebar
-              categories={categories}
-              selectedCategory={selectedCategory}
-              setSelectedCategory={setSelectedCategory}
-              priceRange={priceRange}
-              setPriceRange={setPriceRange}
-              selectedSeasons={selectedSeasons}
-              setSelectedSeasons={setSelectedSeasons}
-              selectedTimes={selectedTimes}
-              setSelectedTimes={setSelectedTimes}
-              maxPrice={maxPrice}
-            />
-          </div>
-        </SheetContent>
-      </Sheet>
+  // Quick Filters Helper
+  const toggleCategory = (catId: string) => {
+    setSelectedCategory(selectedCategory === catId ? "all" : catId)
+  }
 
-      {/* Desktop Sidebar */}
-      <aside className="hidden w-64 flex-shrink-0 lg:block">
+  return (
+    <div className="flex flex-col gap-8 md:flex-row pb-32">
+
+      {/* ── Mobile: Horizontal Pills (Quick Filters) ── */}
+      <div className="md:hidden">
+        <div className="flex items-center gap-2 overflow-x-auto pb-4 scrollbar-none snap-x snap-mandatory px-0.5">
+          {/* 'Todos' Pill */}
+          <button
+            onClick={() => setSelectedCategory("all")}
+            className={cn(
+              "snap-center shrink-0 rounded-full border px-5 py-2 text-sm font-medium transition-all active:scale-95",
+              selectedCategory === "all"
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border/60 bg-transparent text-muted-foreground hover:border-border"
+            )}
+          >
+            Todos
+          </button>
+
+          {/* Category Pills */}
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => toggleCategory(String(cat.id))}
+              className={cn(
+                "snap-center shrink-0 rounded-full border px-5 py-2 text-sm font-medium transition-all active:scale-95",
+                selectedCategory === String(cat.id)
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-border/60 bg-transparent text-muted-foreground hover:border-border"
+              )}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-2 flex items-center justify-between">
+          <h2 className="font-serif text-xl italic text-primary">Colección</h2>
+
+          {/* Advanced Filters Sheet Trigger */}
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 gap-2 text-muted-foreground hover:text-foreground">
+                <SlidersHorizontal className="h-4 w-4" />
+                Filtros {activeFiltersCount > 0 && `(${activeFiltersCount})`}
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="h-[85vh] rounded-t-[2rem] px-6">
+              <SheetHeader className="mb-6 text-left">
+                <SheetTitle className="font-serif text-2xl">Filtros Avanzados</SheetTitle>
+              </SheetHeader>
+              <div className="h-full overflow-y-auto pb-20">
+                <FilterSidebar
+                  categories={categories}
+                  selectedCategory={selectedCategory}
+                  setSelectedCategory={setSelectedCategory}
+                  priceRange={priceRange}
+                  setPriceRange={setPriceRange}
+                  selectedSeasons={selectedSeasons}
+                  setSelectedSeasons={setSelectedSeasons}
+                  selectedTimes={selectedTimes}
+                  setSelectedTimes={setSelectedTimes}
+                  maxPrice={maxPrice}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
+      </div>
+
+      {/* Desktop Sidebar (unchanged) */}
+      <aside className="hidden w-64 flex-shrink-0 md:block">
         <div className="sticky top-24">
           <FilterSidebar
             categories={categories}
@@ -215,8 +260,8 @@ export function ShopContent({
 
       {/* Main Content */}
       <div className="flex-1">
-        {/* Toolbar */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        {/* Desktop Toolbar */}
+        <div className="mb-6 hidden flex-col gap-4 sm:flex-row sm:items-center sm:justify-between lg:flex">
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -246,78 +291,25 @@ export function ShopContent({
           </div>
         </div>
 
-        {/* Active Filters Bar (Desktop) */}
-        {activeFiltersCount > 0 && (
-          <div className="mb-6 flex flex-wrap gap-2">
-            {selectedCategory !== "all" && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setSelectedCategory("all")}
-                className="h-7 text-xs"
-              >
-                Categoría: {categories.find(c => String(c.id) === selectedCategory)?.name}
-                <X className="ml-1 h-3 w-3" />
-              </Button>
-            )}
-            {(priceRange[0] > 0 || priceRange[1] < maxPrice) && (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setPriceRange([0, maxPrice])}
-                className="h-7 text-xs"
-              >
-                Precio: ${priceRange[0]} - ${priceRange[1]}
-                <X className="ml-1 h-3 w-3" />
-              </Button>
-            )}
-            {selectedSeasons.map(s => (
-              <Button
-                key={s}
-                variant="secondary"
-                size="sm"
-                onClick={() => setSelectedSeasons(selectedSeasons.filter(item => item !== s))}
-                className="h-7 text-xs"
-              >
-                {s}
-                <X className="ml-1 h-3 w-3" />
-              </Button>
-            ))}
-            {selectedTimes.map(t => (
-              <Button
-                key={t}
-                variant="secondary"
-                size="sm"
-                onClick={() => setSelectedTimes(selectedTimes.filter(item => item !== t))}
-                className="h-7 text-xs"
-              >
-                {t}
-                <X className="ml-1 h-3 w-3" />
-              </Button>
-            ))}
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSelectedCategory("all")
-                setPriceRange([0, maxPrice])
-                setSelectedSeasons([])
-                setSelectedTimes([])
-                setSearchQuery("")
-              }}
-              className="h-7 text-xs text-muted-foreground hover:text-destructive"
-            >
-              Limpiar todo
-            </Button>
-          </div>
-        )}
-
         {/* Product Grid */}
         {filteredProducts.length > 0 ? (
-          <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 xl:grid-cols-4">
-            {filteredProducts.map((product, index) => (
-              <ProductCard key={product.id} product={product} priority={index < 8} />
-            ))}
+          <div
+            key={JSON.stringify({ selectedCategory, priceRange, selectedSeasons, selectedTimes, searchQuery })}
+            className="grid grid-cols-2 gap-x-4 gap-y-8 md:grid-cols-3 md:gap-8 xl:grid-cols-4"
+          >
+            {filteredProducts.map((product, index) => {
+              // Find category name for the tag
+              const catName = categories.find(c => c.id === product.category)?.name
+              return (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  priority={index < 8}
+                  index={index}
+                  categoryLabel={catName} // Pass tag
+                />
+              )
+            })}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-center border rounded-lg bg-muted/10">
