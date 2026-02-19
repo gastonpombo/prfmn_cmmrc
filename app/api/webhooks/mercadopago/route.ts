@@ -104,11 +104,35 @@ export async function POST(request: NextRequest) {
     }
 
     // ============================================
-    // 4. Verificar que el pago esté aprobado
+    // 4. Mapear status de Mercado Pago → status interno
     // ============================================
-    if (paymentData.status !== 'approved') {
-      console.log(`ℹ️ Pago no aprobado (status: ${paymentData.status}). No se procesa.`)
-      return NextResponse.json({ received: true })
+
+    /**
+     * Tabla de equivalencias MP → Supabase:
+     *
+     * MP status         | Supabase status   | Acción adicional
+     * ------------------|-------------------|------------------
+     * approved          | approved          | descontar stock ✅
+     * in_process        | pending           | esperar siguiente webhook
+     * pending           | pending           | esperar siguiente webhook
+     * authorized        | pending           | esperar captura
+     * rejected          | rejected          | sin acción
+     * cancelled         | cancelled         | sin acción
+     * refunded          | refunded          | sin acción (admin gestiona manualmente)
+     * charged_back      | charged_back      | sin acción
+     */
+
+    const TERMINAL_FAILURE_STATUSES = ['rejected', 'cancelled', 'refunded', 'charged_back'] as const
+    const PENDING_STATUSES = ['in_process', 'pending', 'authorized'] as const
+
+    type MPStatus = typeof TERMINAL_FAILURE_STATUSES[number] | typeof PENDING_STATUSES[number] | 'approved'
+
+    const mpStatus = paymentData.status as MPStatus
+
+    // — Estados no terminales: MP volverá a notificar cuando haya resolución —
+    if ((PENDING_STATUSES as readonly string[]).includes(mpStatus)) {
+      console.log(`ℹ️ Pago en estado intermedio (${mpStatus}). Esperando webhook definitivo.`)
+      return NextResponse.json({ received: true, status: mpStatus })
     }
 
     // ============================================
@@ -128,15 +152,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true })
     }
 
-    console.log(`📝 Procesando orden #${orderId} - Pago aprobado`)
-
     // ============================================
     // 6. Obtener cliente admin de Supabase (bypass RLS)
     // ============================================
     const supabase = getSupabaseAdminClient()
 
     // ============================================
-    // 7. Verificar que la orden exista y no esté ya procesada
+    // 7. Verificar que la orden exista
     // ============================================
     const { data: order, error: orderFetchError } = await supabase
       .from('orders')
@@ -149,15 +171,56 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true })
     }
 
+    // ============================================
+    // 8a. Manejar pagos FALLIDOS / CANCELADOS
+    //     → Solo actualizar status, NO tocar stock
+    // ============================================
+    if ((TERMINAL_FAILURE_STATUSES as readonly string[]).includes(mpStatus)) {
+      // Evitar sobreescribir un pago ya aprobado (edge case: retries desordenados)
+      if (order.status === 'approved' || order.status === 'completed') {
+        console.log(`ℹ️ Orden #${orderId} ya fue aprobada; ignorando webhook tardío (${mpStatus})`)
+        return NextResponse.json({ received: true })
+      }
+
+      const { error: failureUpdateError } = await supabase
+        .from('orders')
+        .update({
+          status: mpStatus,             // 'rejected' | 'cancelled' | 'refunded' | 'charged_back'
+          payment_id: paymentId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', orderId)
+
+      if (failureUpdateError) {
+        console.error(
+          `❌ Error al actualizar orden #${orderId} a '${mpStatus}':`,
+          failureUpdateError.message
+        )
+      } else {
+        console.log(`✅ Orden #${orderId} marcada como '${mpStatus}'`)
+      }
+
+      return NextResponse.json({
+        received: true,
+        order_id: orderId,
+        payment_id: paymentId,
+        status: mpStatus,
+      })
+    }
+
+    // ============================================
+    // 8b. Pago APROBADO → flujo completo con stock
+    // ============================================
+
     // Prevenir doble procesamiento
     if (order.status === 'approved' || order.status === 'completed') {
       console.log(`ℹ️ Orden #${orderId} ya fue procesada (status: ${order.status})`)
       return NextResponse.json({ received: true })
     }
 
-    // ============================================
-    // 8. Actualizar el status de la orden a 'approved'
-    // ============================================
+    console.log(`📝 Procesando orden #${orderId} - Pago aprobado`)
+
+    // Actualizar status a 'approved'
     const { error: updateOrderError } = await supabase
       .from('orders')
       .update({
@@ -169,7 +232,6 @@ export async function POST(request: NextRequest) {
 
     if (updateOrderError) {
       console.error(`❌ Error al actualizar orden #${orderId}:`, updateOrderError.message)
-      // Aún así devolvemos 200 para que MP no reintente
       return NextResponse.json({ received: true })
     }
 
@@ -195,7 +257,6 @@ export async function POST(request: NextRequest) {
     // ============================================
     const stockUpdatePromises = orderItems.map(async (item: OrderItem) => {
       try {
-        // Obtener el producto actual para validar stock
         const { data: product, error: productError } = await supabase
           .from('products')
           .select('id, name, stock')
@@ -203,90 +264,52 @@ export async function POST(request: NextRequest) {
           .single()
 
         if (productError || !product) {
-          console.error(
-            `⚠️ Producto #${item.product_id} no encontrado:`,
-            productError?.message
-          )
-          return {
-            success: false,
-            product_id: item.product_id,
-            error: 'Product not found',
-          }
+          console.error(`⚠️ Producto #${item.product_id} no encontrado:`, productError?.message)
+          return { success: false, product_id: item.product_id, error: 'Product not found' }
         }
 
-        // Validar que hay suficiente stock
         if (product.stock < item.quantity) {
           console.warn(
             `⚠️ Stock insuficiente para producto #${item.product_id} (${product.name}): ` +
-              `disponible=${product.stock}, requerido=${item.quantity}`
+            `disponible=${product.stock}, requerido=${item.quantity}`
           )
-          // Continuar de todos modos (el cliente ya pagó)
         }
 
-        // Restar stock usando función RPC atómica (previene race conditions)
+        // Intentar RPC atómica primero
         const { error: updateStockError } = await supabase.rpc('decrement_stock', {
           row_id: item.product_id,
           quantity_to_subtract: item.quantity,
         })
 
-        // Si la función RPC no existe, hacer UPDATE directo
-        if (updateStockError?.message?.includes('function') ||
-            updateStockError?.message?.includes('does not exist')) {
-          console.log('⚠️ RPC no disponible, usando UPDATE directo')
-
+        if (
+          updateStockError?.message?.includes('function') ||
+          updateStockError?.message?.includes('does not exist')
+        ) {
+          // Fallback: UPDATE directo
           const { error: directUpdateError } = await supabase
             .from('products')
-            .update({
-              stock: product.stock - item.quantity,
-            })
+            .update({ stock: Math.max(0, product.stock - item.quantity) })
             .eq('id', item.product_id)
 
           if (directUpdateError) {
-            console.error(
-              `❌ Error al actualizar stock de producto #${item.product_id}:`,
-              directUpdateError.message
-            )
-            return {
-              success: false,
-              product_id: item.product_id,
-              error: directUpdateError.message,
-            }
+            console.error(`❌ Error stock directo #${item.product_id}:`, directUpdateError.message)
+            return { success: false, product_id: item.product_id, error: directUpdateError.message }
           }
 
           console.log(
-            `✅ Stock actualizado para producto #${item.product_id} (${product.name}): ` +
-              `${product.stock} → ${product.stock - item.quantity}`
+            `✅ Stock actualizado #${item.product_id} (${product.name}): ` +
+            `${product.stock} → ${Math.max(0, product.stock - item.quantity)}`
           )
-
-          return {
-            success: true,
-            product_id: item.product_id,
-            old_stock: product.stock,
-            new_stock: product.stock - item.quantity,
-          }
+          return { success: true, product_id: item.product_id }
         }
 
         if (updateStockError) {
-          console.error(
-            `❌ Error al decrementar stock de producto #${item.product_id}:`,
-            updateStockError.message
-          )
-          return {
-            success: false,
-            product_id: item.product_id,
-            error: updateStockError.message,
-          }
+          console.error(`❌ Error RPC stock #${item.product_id}:`, updateStockError.message)
+          return { success: false, product_id: item.product_id, error: updateStockError.message }
         }
 
-        console.log(
-          `✅ Stock decrementado para producto #${item.product_id} (${product.name}): -${item.quantity}`
-        )
-
-        return {
-          success: true,
-          product_id: item.product_id,
-          quantity_decremented: item.quantity,
-        }
+        console.log(`✅ Stock decrementado #${item.product_id} (${product.name}): -${item.quantity}`)
+        return { success: true, product_id: item.product_id }
       } catch (error) {
         console.error(`❌ Error procesando producto #${item.product_id}:`, error)
         return {
@@ -299,42 +322,24 @@ export async function POST(request: NextRequest) {
 
     const stockUpdateResults = await Promise.allSettled(stockUpdatePromises)
 
-    // Log de resultados
     const successCount = stockUpdateResults.filter(
       (r) => r.status === 'fulfilled' && r.value.success
     ).length
     const errorCount = stockUpdateResults.length - successCount
 
-    console.log(
-      `📊 Actualización de stock completada: ${successCount} éxitos, ${errorCount} errores`
-    )
-
-    if (errorCount > 0) {
-      console.warn('⚠️ Algunos productos no pudieron actualizar su stock:')
-      stockUpdateResults.forEach((result, index) => {
-        if (result.status === 'fulfilled' && !result.value.success) {
-          console.warn(`  - Producto #${orderItems[index].product_id}: ${result.value.error}`)
-        } else if (result.status === 'rejected') {
-          console.warn(`  - Error inesperado: ${result.reason}`)
-        }
-      })
-    }
+    console.log(`📊 Stock: ${successCount} OK, ${errorCount} errores`)
 
     // ============================================
     // 11. Log final y respuesta
     // ============================================
     console.log(`✅ Webhook procesado exitosamente para orden #${orderId}`)
 
-    // SIEMPRE devolver 200 para que Mercado Pago deje de reintentar
     return NextResponse.json({
       received: true,
       order_id: orderId,
       payment_id: paymentId,
       status: 'processed',
-      stock_updates: {
-        success: successCount,
-        errors: errorCount,
-      },
+      stock_updates: { success: successCount, errors: errorCount },
     })
   } catch (error) {
     console.error('❌ Error general en webhook:', error)
