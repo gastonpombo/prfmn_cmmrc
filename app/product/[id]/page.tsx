@@ -6,7 +6,7 @@ import { RelatedProducts } from "@/components/product/related-products"
 import { ProductGallery } from "@/components/product/product-gallery"
 import { ProductActionBar } from "@/components/product/product-action-bar"
 import { RecentlyViewed } from "@/components/product/recently-viewed"
-import { Clock, ShieldCheck, Truck, Sparkles } from "lucide-react"
+import { Clock, Sparkles } from "lucide-react"
 import { NotePills } from "@/components/product/note-pills"
 import { IntensityScale } from "@/components/product/intensity-scale"
 import {
@@ -147,35 +147,6 @@ export default async function ProductPage({ params }: ProductPageProps) {
                         </div>
                       </div>
                     )}
-                  </div>
-                </AccordionContent>
-              </AccordionItem>
-
-              {/* 3. Envío y Devoluciones */}
-              <AccordionItem value="shipping" className="border-white/10">
-                <AccordionTrigger className="font-serif text-lg text-primary hover:text-secondary hover:no-underline">
-                  Envío y Devoluciones
-                </AccordionTrigger>
-                <AccordionContent>
-                  <div className="space-y-4 pt-4 pb-6 font-sans text-sm text-muted-foreground">
-                    <div className="flex items-start gap-4">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary/10 text-secondary">
-                        <Truck className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <p className="mb-1 font-medium text-foreground">Envío Express</p>
-                        <p className="leading-relaxed">Despachamos tu pedido en menos de 24hs. Envío gratis a partir de $50.000.</p>
-                      </div>
-                    </div>
-                    <div className="flex items-start gap-4">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-secondary/10 text-secondary">
-                        <ShieldCheck className="h-4 w-4" />
-                      </div>
-                      <div>
-                        <p className="mb-1 font-medium text-foreground">Garantía de Satisfacción</p>
-                        <p className="leading-relaxed">Tu satisfacción es nuestra prioridad. Si tenés algún inconveniente, contactanos.</p>
-                      </div>
-                    </div>
                   </div>
                 </AccordionContent>
               </AccordionItem>
