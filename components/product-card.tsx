@@ -10,11 +10,12 @@ export function ProductCard({ product, priority = false }: { product: Product; p
   const { addItem } = useCart()
 
   return (
-    <div className="group flex flex-col">
-      {/* Image Container - 3:4 ratio for tall perfume bottles */}
+    <article className="group flex flex-col cursor-pointer">
+      {/* ── Image Container ─────────────────────────────────── */}
       <Link
         href={`/product/${product.id}`}
-        className="relative aspect-[3/4] overflow-hidden border border-border bg-neutral-50"
+        className="relative aspect-[3/4] overflow-hidden bg-[hsl(24,8%,12%)]"
+        style={{ boxShadow: "inset 0 0 0 1px hsl(36 12% 18% / 0.6)" }}
       >
         <Image
           src={product.image_url || "/images/hero-perfume.jpg"}
@@ -22,20 +23,22 @@ export function ProductCard({ product, priority = false }: { product: Product; p
           fill
           priority={priority}
           loading={priority ? "eager" : "lazy"}
-          className="object-contain p-6 transition-all duration-700 group-hover:scale-105"
+          className="object-contain p-8 transition-transform duration-700 ease-out group-hover:scale-[1.04]"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
+
+        {/* Gradient shimmer — rich depth on hover */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
 
         {/* Sold out overlay */}
         {product.stock <= 0 && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-            <span className="font-sans text-xs font-semibold uppercase tracking-[0.15em] text-white/80">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/75 backdrop-blur-[2px]">
+            <span className="font-sans text-[10px] font-semibold uppercase tracking-[0.2em] text-white/60">
               Agotado
             </span>
           </div>
         )}
 
-        {/* Desktop-only hover cart button (inside image) */}
+        {/* Desktop hover cart — antique gold pill bottom-right */}
         <button
           type="button"
           onClick={(e) => {
@@ -44,40 +47,54 @@ export function ProductCard({ product, priority = false }: { product: Product; p
             addItem(product)
           }}
           disabled={product.stock <= 0}
-          className="absolute bottom-3 right-3 z-10 hidden h-11 w-11 items-center justify-center border border-secondary bg-secondary text-secondary-foreground opacity-0 transition-all duration-500 group-hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-50 md:flex"
+          className="absolute bottom-4 right-4 z-10 hidden h-10 w-10 items-center justify-center border border-secondary/70 bg-secondary/90 text-secondary-foreground
+                     opacity-0 transition-all duration-500 ease-out
+                     hover:bg-secondary hover:border-secondary
+                     group-hover:opacity-100
+                     disabled:cursor-not-allowed disabled:opacity-30
+                     md:flex"
+          style={{ backdropFilter: "blur(4px)" }}
           aria-label={`Agregar ${product.name} al carrito`}
         >
-          <ShoppingBag className="h-[18px] w-[18px]" />
+          <ShoppingBag className="h-[15px] w-[15px]" />
         </button>
       </Link>
 
-      {/* Product Info */}
-      <div className="mt-4 flex flex-col gap-1.5 px-1">
+      {/* ── Product Info ─────────────────────────────────────── */}
+      <div className="mt-5 flex flex-col gap-2 px-0.5">
+        {/* Brand / name */}
         <Link href={`/product/${product.id}`}>
-          <h3 className="font-sans text-sm font-medium uppercase tracking-[0.08em] text-primary/90 transition-colors hover:text-secondary">
+          <h3 className="font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-primary/70 transition-colors duration-300 hover:text-secondary line-clamp-2">
             {product.name}
           </h3>
         </Link>
-        <span className="font-serif text-2xl font-light tracking-tight text-secondary">
+
+        {/* Price */}
+        <span className="font-serif text-xl font-light tracking-tight text-secondary">
           ${product.price.toLocaleString("es-AR")}
         </span>
       </div>
 
-      {/* Mobile-only always-visible cart button (below info) */}
-      <div className="mt-3 px-1 md:hidden">
+      {/* ── Mobile CTA ───────────────────────────────────────── */}
+      <div className="mt-3 md:hidden">
         <button
           type="button"
           onClick={() => addItem(product)}
           disabled={product.stock <= 0}
-          className="flex h-11 w-full items-center justify-center gap-2 border border-secondary bg-secondary text-secondary-foreground transition-opacity hover:opacity-90 active:opacity-80 disabled:cursor-not-allowed disabled:opacity-50"
+          className="flex h-10 w-full items-center justify-center gap-2
+                     border border-secondary/60 bg-transparent text-secondary
+                     transition-colors duration-300
+                     hover:bg-secondary hover:text-secondary-foreground
+                     active:opacity-80
+                     disabled:cursor-not-allowed disabled:opacity-30"
           aria-label={`Agregar ${product.name} al carrito`}
         >
-          <ShoppingBag className="h-4 w-4" />
-          <span className="font-sans text-xs font-semibold uppercase tracking-widest">
+          <ShoppingBag className="h-3.5 w-3.5" />
+          <span className="font-sans text-[9px] font-semibold uppercase tracking-[0.2em]">
             Agregar
           </span>
         </button>
       </div>
-    </div>
+    </article>
   )
 }

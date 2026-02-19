@@ -14,13 +14,13 @@ export function Footer({ contactEmail, contactWhatsapp }: FooterProps) {
   const displayWhatsapp = contactWhatsapp || "+54 9 11 1234-5678"
 
   return (
-    <footer className="border-t border-border/30 bg-black">
+    <footer className="border-t border-border/20" style={{ background: "hsl(24, 8%, 5%)" }}>
       <div className="mx-auto max-w-7xl px-4 py-20">
         <div className="grid grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-4">
           {/* Brand */}
           <div className="flex flex-col gap-5">
-            <span className="font-serif text-2xl tracking-[0.05em] text-white">PerfuMan</span>
-            <p className="font-sans text-sm leading-relaxed text-white/50">
+            <span className="font-serif text-xl tracking-[0.1em] text-foreground/90">PerfuMan</span>
+            <p className="font-sans text-sm leading-relaxed text-foreground/40">
               Descubr&iacute; fragancias que cuentan historias. Cada perfume es una experiencia
               &uacute;nica, seleccionada con pasi&oacute;n y dedicaci&oacute;n.
             </p>
@@ -28,7 +28,7 @@ export function Footer({ contactEmail, contactWhatsapp }: FooterProps) {
 
           {/* Tienda */}
           <div className="flex flex-col gap-5">
-            <h4 className="font-sans text-[10px] font-semibold uppercase tracking-[0.15em] text-white/80">Tienda</h4>
+            <h4 className="font-sans text-[10px] font-semibold uppercase tracking-[0.15em] text-foreground/50">Tienda</h4>
             <nav className="flex flex-col gap-3">
               <Link
                 href="/shop"
@@ -53,25 +53,25 @@ export function Footer({ contactEmail, contactWhatsapp }: FooterProps) {
 
           {/* Ayuda y Legales */}
           <div className="flex flex-col gap-5">
-            <h4 className="font-sans text-[10px] font-semibold uppercase tracking-[0.15em] text-white/80">
+            <h4 className="font-sans text-[10px] font-semibold uppercase tracking-[0.15em] text-foreground/50">
               Ayuda y Legales
             </h4>
             <nav className="flex flex-col gap-3">
               <Link
                 href="/returns"
-                className="font-sans text-sm text-white/50 transition-colors duration-300 hover:text-secondary"
+                className="font-sans text-sm text-foreground/40 transition-colors duration-300 hover:text-secondary"
               >
                 Pol&iacute;ticas de Devoluci&oacute;n
               </Link>
               <Link
                 href="/terms"
-                className="font-sans text-sm text-white/50 transition-colors duration-300 hover:text-secondary"
+                className="font-sans text-sm text-foreground/40 transition-colors duration-300 hover:text-secondary"
               >
                 T&eacute;rminos de Uso
               </Link>
               <Link
                 href="#"
-                className="font-sans text-sm text-white/50 transition-colors duration-300 hover:text-secondary"
+                className="font-sans text-sm text-foreground/40 transition-colors duration-300 hover:text-secondary"
               >
                 Preguntas Frecuentes
               </Link>
@@ -80,13 +80,13 @@ export function Footer({ contactEmail, contactWhatsapp }: FooterProps) {
 
           {/* Contacto & Newsletter */}
           <div className="flex flex-col gap-5">
-            <h4 className="font-sans text-[10px] font-semibold uppercase tracking-[0.15em] text-white/80">
+            <h4 className="font-sans text-[10px] font-semibold uppercase tracking-[0.15em] text-foreground/50">
               Contacto
             </h4>
-            <p className="font-sans text-sm text-white/50">
+            <p className="font-sans text-sm text-foreground/40">
               {"WhatsApp: "}{displayWhatsapp}
             </p>
-            <p className="font-sans text-sm text-white/50">
+            <p className="font-sans text-sm text-foreground/40">
               {displayEmail}
             </p>
             <div className="mt-2">
@@ -100,7 +100,7 @@ export function Footer({ contactEmail, contactWhatsapp }: FooterProps) {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Tu email"
-                  className="flex-1 border border-white/20 bg-white/5 px-4 py-2.5 font-sans text-sm text-white placeholder:text-white/30 focus:border-secondary focus:outline-none"
+                  className="flex-1 border border-border/40 bg-foreground/5 px-4 py-2.5 font-sans text-sm text-foreground/80 placeholder:text-foreground/25 focus:border-secondary focus:outline-none"
                 />
                 <button
                   type="button"
@@ -113,8 +113,8 @@ export function Footer({ contactEmail, contactWhatsapp }: FooterProps) {
           </div>
         </div>
 
-        <div className="mt-16 border-t border-white/10 pt-8">
-          <p className="text-center font-sans text-[10px] uppercase tracking-[0.15em] text-white/30">
+        <div className="mt-16 border-t border-border/15 pt-8">
+          <p className="text-center font-sans text-[10px] uppercase tracking-[0.15em] text-foreground/25">
             &copy; {new Date().getFullYear()} PerfuMan. Todos los derechos reservados.
           </p>
         </div>

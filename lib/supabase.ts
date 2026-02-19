@@ -96,6 +96,7 @@ export type Order = {
   total_amount: number // numeric
   status: string // text (ej: 'pending', 'completed', 'cancelled')
   payment_id?: string | null // text
+  customer_email?: string | null // text — columna dedicada para búsquedas rápidas
   customer_details: CustomerDetails // jsonb
   user_id?: string | null // uuid (null para usuarios anónimos)
   created_at?: string
@@ -112,6 +113,11 @@ export type CustomerDetails = {
     state?: string
     postal_code?: string
     country?: string
+  }
+  extra_details?: {
+    ci?: string
+    shipping_company?: string // 'DAC' | 'UES'
+    shipping_method?: string  // 'domicilio' | 'agencia'
   }
 }
 

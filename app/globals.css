@@ -8,41 +8,85 @@
   }
 }
 
+/* ============================================================
+   PerfuMan — Luxury Dark Design System
+   Palette: Warm Near-Black + Antique Gold + Ivory
+   ============================================================ */
 @layer base {
   :root {
-    --background: 0 0% 4%;
-    --foreground: 0 0% 96%;
-    --card: 0 0% 7%;
-    --card-foreground: 0 0% 96%;
-    --popover: 0 0% 4%;
-    --popover-foreground: 0 0% 96%;
-    --primary: 0 0% 96%;
-    --primary-foreground: 0 0% 4%;
-    --secondary: 43 74% 49%;
-    --secondary-foreground: 0 0% 4%;
-    --muted: 0 0% 10%;
-    --muted-foreground: 0 0% 55%;
-    --accent: 0 0% 10%;
-    --accent-foreground: 0 0% 96%;
-    --highlight: 43 74% 49%;
-    --highlight-foreground: 0 0% 4%;
-    --destructive: 0 84.2% 60.2%;
+    /* Backgrounds — warm deep espresso, not cold grey */
+    --background:        24 8% 7%;       /* #141210  deep warm black */
+    --foreground:        40 30% 92%;     /* #EDE9DF  warm ivory */
+
+    /* Card surfaces — slightly lifted warm layer */
+    --card:              24 8% 10%;      /* #1B1815  warm card */
+    --card-foreground:   40 30% 92%;
+
+    /* Popover / Dropdown — slightly cooler to float above cards */
+    --popover:           24 8% 9%;
+    --popover-foreground: 40 30% 92%;
+
+    /* Primary — warm ivory foreground (text, icons) */
+    --primary:           40 30% 92%;     /* #EDE9DF  ivory */
+    --primary-foreground: 24 8% 7%;
+
+    /* Secondary — antique warm gold (CTAs, highlights) */
+    --secondary:         40 58% 52%;     /* #C8A55A  antique gold */
+    --secondary-foreground: 24 10% 8%;  /* near-black on gold */
+
+    /* Muted — subtle warm surface for chips, tags, etc. */
+    --muted:             24 8% 14%;      /* #231F1B */
+    --muted-foreground:  40 15% 55%;    /* #9E9589  warm grey */
+
+    /* Accent — warm bronze/gold tint for interactive states */
+    --accent:            36 20% 16%;     /* #2C2520  warm tint */
+    --accent-foreground: 40 30% 92%;
+
+    /* Internal custom highlight alias */
+    --highlight:         40 58% 52%;
+    --highlight-foreground: 24 10% 8%;
+
+    /* Destructive */
+    --destructive:       0 62% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 15%;
-    --input: 0 0% 15%;
-    --ring: 43 74% 49%;
-    --radius: 0rem;
+
+    /* Borders & Inputs — barely-there warm line */
+    --border:            36 12% 18%;     /* #2F2924 */
+    --input:             36 10% 16%;
+    --ring:              40 58% 52%;     /* gold focus ring */
+
+    /* Border radius — razor-clean, ultra luxury */
+    --radius: 0.125rem;                 /* 2px — near-square */
   }
 }
 
+/* ============================================================
+   Base Element Styles
+   ============================================================ */
 @layer base {
   * {
     @apply border-border;
   }
-  body {
-    @apply bg-background text-foreground antialiased;
+
+  html {
+    font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+
+  body {
+    @apply bg-background text-foreground;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Serif headlines — Playfair Display */
   h1, h2, h3, h4, h5, h6 {
     @apply font-serif;
+    letter-spacing: 0.01em;
+  }
+
+  /* Thin gold divider utility */
+  .gold-line {
+    @apply block h-px w-12 bg-secondary opacity-60;
   }
 }

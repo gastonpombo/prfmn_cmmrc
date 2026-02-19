@@ -57,28 +57,46 @@ export function ShopContent({
   useEffect(() => {
     const timer = setTimeout(() => {
       const params = new URLSearchParams(searchParams.toString())
-      if (searchQuery) {
-        params.set("q", searchQuery)
-      } else {
-        params.delete("q")
+      const currentQ = params.get("q") || ""
+
+      // Only update if changed prevents unnecessary replaces
+      if (searchQuery !== currentQ) {
+        if (searchQuery) {
+          params.set("q", searchQuery)
+        } else {
+          params.delete("q")
+        }
+        router.replace(`${pathname}?${params.toString()}`, { scroll: false })
       }
-      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
     }, 500)
     return () => clearTimeout(timer)
-  }, [searchQuery, router, pathname, searchParams])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, router, pathname]) // Removed searchParams to prevent loop
 
   // Update URL for other filters
   useEffect(() => {
     const params = new URLSearchParams(searchParams.toString())
+    let hasChanges = false
 
-    if (selectedCategory !== "all") params.set("category", selectedCategory)
-    else params.delete("category")
+    const currentCategory = params.get("category") || "all"
+    if (selectedCategory !== currentCategory) {
+      if (selectedCategory !== "all") params.set("category", selectedCategory)
+      else params.delete("category")
+      hasChanges = true
+    }
 
-    if (sortBy !== "newest") params.set("sort", sortBy)
-    else params.delete("sort")
+    const currentSort = params.get("sort") || "newest"
+    if (sortBy !== currentSort) {
+      if (sortBy !== "newest") params.set("sort", sortBy)
+      else params.delete("sort")
+      hasChanges = true
+    }
 
-    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
-  }, [selectedCategory, sortBy, pathname, router, searchParams])
+    if (hasChanges) {
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCategory, sortBy, pathname, router]) // Removed searchParams to prevent loop
 
   // Filtering Logic
   const filteredProducts = useMemo(() => {

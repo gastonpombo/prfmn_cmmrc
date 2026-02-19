@@ -9,7 +9,7 @@ import { MercadoPagoConfig, Preference } from "mercadopago"
 type CartItem = {
   id: number
   name: string
-  price: number // ⚠️ NO se usa - solo para compatibilidad con frontend
+  price: number
   quantity: number
 }
 
@@ -23,6 +23,11 @@ type CustomerInfo = {
     state?: string
     postal_code?: string
     country?: string
+  }
+  extra_details?: {
+    ci?: string
+    shipping_company?: string
+    shipping_method?: string
   }
 }
 
@@ -150,14 +155,6 @@ export async function POST(request: NextRequest) {
       // ✅ Usar precio real de la base de datos
       total_amount += dbProduct.price * item.quantity
 
-      // Log warning si el frontend envió precio incorrecto
-      if (Math.abs(item.price - dbProduct.price) > 0.01) {
-        console.warn(
-          `⚠️ Precio incorrecto detectado para "${dbProduct.name}": ` +
-          `frontend=$${item.price}, db=$${dbProduct.price} (usando precio de DB)`
-        )
-      }
-
       validatedItems.push({ item, dbProduct })
     }
 
@@ -192,7 +189,8 @@ export async function POST(request: NextRequest) {
       .insert({
         total_amount, // ✅ Total calculado con precios reales
         status: "pending",
-        customer_details: customer_info,
+        customer_email: customer_info.email, // 📧 Email obligatorio para contacto
+        customer_details: customer_info, // 📦 JSON completo con dirección, CI, opciones de envío, etc.
         user_id: null, // null para usuarios anónimos
       })
       .select()
@@ -248,11 +246,14 @@ export async function POST(request: NextRequest) {
       title: dbProduct.name,
       quantity: item.quantity,
       unit_price: dbProduct.price, // ✅ Usar precio real
-      currency_id: "ARS", // Cambiar según tu moneda: USD, MXN, CLP, etc.
+      currency_id: "ARS", // Ajustar moneda según corresponda (UYU o ARS)
     }))
 
     // URLs de retorno
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"
+    // ✅ FALLBACK ROBUSTO: Si no hay variable de entorno, usar localhost (para desarrollo)
+    // En producción, Vercel suele inyectar VERCEL_URL, pero es mejor configurar NEXT_PUBLIC_BASE_URL explícitamente.
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ||
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
 
     try {
       const preferenceResponse = await preference.create({
@@ -272,19 +273,21 @@ export async function POST(request: NextRequest) {
                 zip_code: customer_info.address.postal_code,
               }
               : undefined,
+            // ⚠️ MercadoPago TS SDK limitation: Identification might not be fully typed in 'payer'
+            // We can pass it if supported, or rely on our internal `extra_details`
           },
           back_urls: {
             success: `${baseUrl}/checkout/success`,
             failure: `${baseUrl}/checkout/failure`,
             pending: `${baseUrl}/checkout/pending`,
           },
-          auto_return: "approved", // Redirección automática al aprobar
-          external_reference: orderId.toString(), // 🔑 Clave para el webhook
-          notification_url: `${baseUrl}/api/webhooks/mercadopago`, // Webhook para notificaciones
-          statement_descriptor: "PerfuMan", // Aparece en el resumen de la tarjeta
+          auto_return: "approved",
+          external_reference: orderId.toString(),
+          notification_url: `${baseUrl}/api/webhooks/mercadopago`,
+          statement_descriptor: "PerfuMan",
           expires: true,
           expiration_date_from: new Date().toISOString(),
-          expiration_date_to: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // Expira en 24h
+          expiration_date_to: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24h
         },
       })
 
@@ -307,30 +310,27 @@ export async function POST(request: NextRequest) {
 
       if (updateError) {
         console.error("⚠️ Error al actualizar payment_id:", updateError)
-        // No hacemos rollback aquí porque la preferencia ya fue creada
-        // El webhook podrá actualizar el estado más tarde
-      } else {
-        console.log(`✅ Orden ${orderId} actualizada con payment_id: ${preferenceResponse.id}`)
+        // No bloqueo flujo, el webhook puede corregir
       }
 
       // ============================================
-      // PASO 5: Devolver la URL de pago al frontend
+      // PASO 5: Responder al cliente
       // ============================================
 
       return NextResponse.json(
         {
           success: true,
           order_id: orderId,
-          init_point: preferenceResponse.init_point, // URL para redirigir al usuario
+          init_point: preferenceResponse.init_point,
           preference_id: preferenceResponse.id,
-          total_amount, // ✅ Total real calculado server-side
+          total_amount,
         },
         { status: 201 }
       )
     } catch (mpError: unknown) {
       console.error("❌ Error al crear preferencia de Mercado Pago:", mpError)
 
-      // Rollback: Eliminar orden y items
+      // Rollback
       await supabase.from("order_items").delete().eq("order_id", orderId)
       await supabase.from("orders").delete().eq("id", orderId)
 

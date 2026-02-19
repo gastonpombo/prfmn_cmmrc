@@ -57,10 +57,10 @@ export function Navbar() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border/30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90">
+    <header className="sticky top-0 z-40 border-b border-border/20 bg-background/92 backdrop-blur-md supports-[backdrop-filter]:bg-background/88">
       <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-5">
         {/* Logo */}
-        <Link href="/" className="font-serif text-2xl tracking-[0.05em] text-primary transition-colors hover:text-secondary">
+        <Link href="/" className="font-serif text-xl tracking-[0.1em] text-primary transition-colors duration-300 hover:text-secondary">
           PerfuMan
         </Link>
 
@@ -88,7 +88,7 @@ export function Navbar() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Buscar..."
-                className="w-32 border-b border-border bg-transparent px-2 py-1 text-sm text-primary placeholder:text-primary/40 focus:border-secondary focus:outline-none sm:w-48"
+                className="w-32 border-b border-border/60 bg-transparent px-2 py-1 text-sm text-primary placeholder:text-primary/30 focus:border-secondary focus:outline-none sm:w-48"
                 autoFocus
               />
               <button
@@ -166,7 +166,7 @@ export function Navbar() {
           >
             <ShoppingBag className="h-[18px] w-[18px]" />
             {totalItems > 0 && (
-              <span className="absolute -right-2 -top-2 flex h-[18px] w-[18px] items-center justify-center bg-secondary text-[9px] font-bold text-secondary-foreground">
+              <span className="absolute -right-2 -top-2 flex h-[16px] w-[16px] items-center justify-center bg-secondary text-[8px] font-bold text-secondary-foreground">
                 {totalItems}
               </span>
             )}
@@ -186,7 +186,7 @@ export function Navbar() {
 
       {/* Mobile Nav */}
       {mobileOpen && (
-        <div className="border-t border-border/30 bg-background md:hidden">
+        <div className="border-t border-border/20 bg-background md:hidden">
           <ul className="flex flex-col items-center gap-6 py-8">
             {navLinks.map((link) => (
               <li key={link.href}>

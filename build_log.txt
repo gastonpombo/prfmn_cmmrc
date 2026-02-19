@@ -1,0 +1,40 @@
+
+> my-project@0.1.0 build
+> next build
+
+▲ Next.js 16.1.6 (Turbopack)
+- Environments: .env.local
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 3.5s
+  Running TypeScript ...
+  Collecting page data using 15 workers ...
+  Generating static pages using 15 workers (0/15) ...
+  Generating static pages using 15 workers (3/15) 
+  Generating static pages using 15 workers (7/15) 
+  Generating static pages using 15 workers (11/15) 
+✓ Generating static pages using 15 workers (15/15) in 466.3ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ○ /
+├ ○ /_not-found
+├ ○ /about
+├ ƒ /api/checkout
+├ ƒ /api/webhooks/mercadopago
+├ ○ /checkout
+├ ○ /checkout/failure
+├ ○ /checkout/pending
+├ ○ /checkout/success
+├ ○ /contact
+├ ○ /login
+├ ƒ /product/[id]
+├ ○ /profile
+├ ○ /returns
+├ ƒ /shop
+└ ○ /terms
+
+
+○  (Static)   prerendered as static content
+ƒ  (Dynamic)  server-rendered on demand
+

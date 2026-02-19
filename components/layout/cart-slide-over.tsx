@@ -2,10 +2,12 @@
 
 import { X, Minus, Plus, ShoppingBag } from "lucide-react"
 import { useCart } from "@/context/cart-context"
-import { CheckoutButton } from "@/components/checkout/checkout-button"
+import { Button } from "@/components/ui/button"
 import Image from "next/image"
+import { useRouter } from "next/navigation"
 
 export function CartSlideOver() {
+  const router = useRouter()
   const { items, isOpen, closeCart, removeItem, updateQuantity, totalPrice } =
     useCart()
 
@@ -125,11 +127,16 @@ export function CartSlideOver() {
                 ${totalPrice.toLocaleString("es-AR")}
               </span>
             </div>
-            <CheckoutButton
-              onSuccess={() => {
-                closeCart() // Cerrar el carrito al redirigir
+            <Button
+              className="w-full"
+              size="lg"
+              onClick={() => {
+                closeCart()
+                router.push('/checkout')
               }}
-            />
+            >
+              Ir al Checkout
+            </Button>
           </div>
         )}
       </div>
