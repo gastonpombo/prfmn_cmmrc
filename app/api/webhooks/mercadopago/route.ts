@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
 
     // ============================================
     // 8a. Manejar pagos FALLIDOS / CANCELADOS
-    //     → Solo actualizar status, NO tocar stock
+    //     → Actualizar status + restaurar stock reservado
     // ============================================
     if ((TERMINAL_FAILURE_STATUSES as readonly string[]).includes(mpStatus)) {
       // Evitar sobreescribir un pago ya aprobado (edge case: retries desordenados)
@@ -182,6 +182,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ received: true })
       }
 
+      // Sólo restaurar stock si la orden estaba en 'pending'
+      // (es decir, si el stock fue reservado al crear la orden)
+      const stockWasReserved = order.status === 'pending'
+
+      // 1. Actualizar el status de la orden
       const { error: failureUpdateError } = await supabase
         .from('orders')
         .update({
@@ -200,6 +205,34 @@ export async function POST(request: NextRequest) {
         console.log(`✅ Orden #${orderId} marcada como '${mpStatus}'`)
       }
 
+      // 2. Restaurar stock atómicamente si fue reservado
+      if (stockWasReserved) {
+        const { data: failedItems } = await supabase
+          .from('order_items')
+          .select('product_id, quantity')
+          .eq('order_id', orderId)
+
+        if (failedItems && failedItems.length > 0) {
+          console.log(`🔄 Restaurando stock de ${failedItems.length} productos para orden #${orderId}...`)
+
+          for (const fi of failedItems) {
+            const { error: restoreErr } = await supabase.rpc('increment_stock', {
+              row_id: fi.product_id,
+              quantity_to_add: fi.quantity,
+            })
+
+            if (restoreErr) {
+              console.error(
+                `❌ Error al restaurar stock del producto #${fi.product_id}:`,
+                restoreErr.message
+              )
+            } else {
+              console.log(`✅ Stock restaurado: producto #${fi.product_id} +${fi.quantity}`)
+            }
+          }
+        }
+      }
+
       return NextResponse.json({
         received: true,
         order_id: orderId,
@@ -209,7 +242,9 @@ export async function POST(request: NextRequest) {
     }
 
     // ============================================
-    // 8b. Pago APROBADO → flujo completo con stock
+    // 8b. Pago APROBADO → sólo actualizar status
+    //     Stock ya fue reservado en /api/checkout via check_and_decrease_stock
+    //     NO volver a decrementar aquí.
     // ============================================
 
     // Prevenir doble procesamiento
@@ -218,9 +253,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true })
     }
 
-    console.log(`📝 Procesando orden #${orderId} - Pago aprobado`)
+    console.log(`📝 Confirmando orden #${orderId} - Pago aprobado`)
 
-    // Actualizar status a 'approved'
     const { error: updateOrderError } = await supabase
       .from('orders')
       .update({
@@ -235,111 +269,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true })
     }
 
-    console.log(`✅ Orden #${orderId} actualizada a status 'approved'`)
-
-    // ============================================
-    // 9. Obtener los items de la orden
-    // ============================================
-    const { data: orderItems, error: itemsError } = await supabase
-      .from('order_items')
-      .select('id, product_id, quantity')
-      .eq('order_id', orderId)
-
-    if (itemsError || !orderItems || orderItems.length === 0) {
-      console.error(`❌ Error al obtener items de orden #${orderId}:`, itemsError?.message)
-      return NextResponse.json({ received: true })
-    }
-
-    console.log(`📦 Orden #${orderId} tiene ${orderItems.length} items`)
-
-    // ============================================
-    // 10. Restar stock de cada producto
-    // ============================================
-    const stockUpdatePromises = orderItems.map(async (item: OrderItem) => {
-      try {
-        const { data: product, error: productError } = await supabase
-          .from('products')
-          .select('id, name, stock')
-          .eq('id', item.product_id)
-          .single()
-
-        if (productError || !product) {
-          console.error(`⚠️ Producto #${item.product_id} no encontrado:`, productError?.message)
-          return { success: false, product_id: item.product_id, error: 'Product not found' }
-        }
-
-        if (product.stock < item.quantity) {
-          console.warn(
-            `⚠️ Stock insuficiente para producto #${item.product_id} (${product.name}): ` +
-            `disponible=${product.stock}, requerido=${item.quantity}`
-          )
-        }
-
-        // Intentar RPC atómica primero
-        const { error: updateStockError } = await supabase.rpc('decrement_stock', {
-          row_id: item.product_id,
-          quantity_to_subtract: item.quantity,
-        })
-
-        if (
-          updateStockError?.message?.includes('function') ||
-          updateStockError?.message?.includes('does not exist')
-        ) {
-          // Fallback: UPDATE directo
-          const { error: directUpdateError } = await supabase
-            .from('products')
-            .update({ stock: Math.max(0, product.stock - item.quantity) })
-            .eq('id', item.product_id)
-
-          if (directUpdateError) {
-            console.error(`❌ Error stock directo #${item.product_id}:`, directUpdateError.message)
-            return { success: false, product_id: item.product_id, error: directUpdateError.message }
-          }
-
-          console.log(
-            `✅ Stock actualizado #${item.product_id} (${product.name}): ` +
-            `${product.stock} → ${Math.max(0, product.stock - item.quantity)}`
-          )
-          return { success: true, product_id: item.product_id }
-        }
-
-        if (updateStockError) {
-          console.error(`❌ Error RPC stock #${item.product_id}:`, updateStockError.message)
-          return { success: false, product_id: item.product_id, error: updateStockError.message }
-        }
-
-        console.log(`✅ Stock decrementado #${item.product_id} (${product.name}): -${item.quantity}`)
-        return { success: true, product_id: item.product_id }
-      } catch (error) {
-        console.error(`❌ Error procesando producto #${item.product_id}:`, error)
-        return {
-          success: false,
-          product_id: item.product_id,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        }
-      }
-    })
-
-    const stockUpdateResults = await Promise.allSettled(stockUpdatePromises)
-
-    const successCount = stockUpdateResults.filter(
-      (r) => r.status === 'fulfilled' && r.value.success
-    ).length
-    const errorCount = stockUpdateResults.length - successCount
-
-    console.log(`📊 Stock: ${successCount} OK, ${errorCount} errores`)
-
-    // ============================================
-    // 11. Log final y respuesta
-    // ============================================
-    console.log(`✅ Webhook procesado exitosamente para orden #${orderId}`)
+    console.log(`✅ Orden #${orderId} confirmada como 'approved' (stock ya reservado en checkout)`)
 
     return NextResponse.json({
       received: true,
       order_id: orderId,
       payment_id: paymentId,
       status: 'processed',
-      stock_updates: { success: successCount, errors: errorCount },
     })
   } catch (error) {
     console.error('❌ Error general en webhook:', error)

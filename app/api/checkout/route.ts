@@ -180,26 +180,81 @@ export async function POST(request: NextRequest) {
 
     console.log(`✅ Validación completada: ${validatedItems.length} productos, total=$${total_amount}`)
 
-    // ============================================
-    // PASO 1: Insertar la orden con status 'pending'
-    // ============================================
+    // ============================================================
+    // PASO 1: 🔒 Reserva atómica de stock  (ANTES de crear la orden)
+    //   check_and_decrease_stock devuelve TRUE si hay stock y lo descuenta,
+    //   FALSE si el stock es insuficiente. Usa FOR UPDATE internamente.
+    // ============================================================
+
+    const reservedProductIds: number[] = [] // Para rollback parcial
+
+    for (const { item, dbProduct } of validatedItems) {
+      const { data: reserved, error: rpcError } = await supabase.rpc(
+        'check_and_decrease_stock',
+        { row_id: item.id, qty: item.quantity }
+      )
+
+      if (rpcError) {
+        console.error(`❌ RPC check_and_decrease_stock falló para #${item.id}:`, rpcError.message)
+        // Rollback de los que ya fueron reservados
+        for (const reservedId of reservedProductIds) {
+          const qty = validatedItems.find(({ item: i }) => i.id === reservedId)?.item.quantity ?? 0
+          await supabase.rpc('increment_stock', { row_id: reservedId, quantity_to_add: qty })
+        }
+        return NextResponse.json(
+          { error: 'Error al reservar stock', details: rpcError.message },
+          { status: 500 }
+        )
+      }
+
+      if (!reserved) {
+        // Stock insuficiente para este producto → rollback de los ya reservados
+        console.warn(`⚠️ Sin stock para "${dbProduct.name}" (#${item.id})`)
+        for (const reservedId of reservedProductIds) {
+          const qty = validatedItems.find(({ item: i }) => i.id === reservedId)?.item.quantity ?? 0
+          await supabase.rpc('increment_stock', { row_id: reservedId, quantity_to_add: qty })
+        }
+        return NextResponse.json(
+          {
+            error: 'stock_unavailable',
+            message: `Lo sentimos, nos quedamos sin stock de "${dbProduct.name}" mientras realizabas tu compra.`,
+            product_id: item.id,
+          },
+          { status: 409 }
+        )
+      }
+
+      reservedProductIds.push(item.id)
+      console.log(`✅ Stock reservado: "${dbProduct.name}" -${item.quantity}`)
+    }
+
+    console.log(`✅ Stock 100% reservado para ${validatedItems.length} productos`)
+
+    // ============================================================
+    // PASO 2: Crear la orden con status 'pending'
+    //   (stock ya asegurado antes de este punto)
+    // ============================================================
 
     const { data: order, error: orderError } = await supabase
-      .from("orders")
+      .from('orders')
       .insert({
-        total_amount, // ✅ Total calculado con precios reales
-        status: "pending",
-        customer_email: customer_info.email, // 📧 Email obligatorio para contacto
-        customer_details: customer_info, // 📦 JSON completo con dirección, CI, opciones de envío, etc.
-        user_id: null, // null para usuarios anónimos
+        total_amount,
+        status: 'pending',
+        customer_email: customer_info.email,
+        customer_details: customer_info,
+        user_id: null,
       })
       .select()
       .single()
 
     if (orderError || !order) {
-      console.error("❌ Error al crear la orden:", orderError)
+      console.error('❌ Error al crear la orden:', orderError)
+      // Rollback total de stock
+      for (const { item } of validatedItems) {
+        await supabase.rpc('increment_stock', { row_id: item.id, quantity_to_add: item.quantity })
+      }
       return NextResponse.json(
-        { error: "Error al crear la orden", details: orderError?.message },
+        { error: 'Error al crear la orden', details: orderError?.message },
         { status: 500 }
       )
     }
@@ -207,32 +262,35 @@ export async function POST(request: NextRequest) {
     const orderId = order.id
     console.log(`✅ Orden creada con ID: ${orderId}`)
 
-    // ============================================
-    // PASO 2: Insertar los order_items (CON PRECIOS REALES)
-    // ============================================
+    // ============================================================
+    // PASO 3: Insertar los order_items (con precios reales)
+    // ============================================================
 
     const orderItems = validatedItems.map(({ item, dbProduct }) => ({
       order_id: orderId,
       product_id: item.id,
       quantity: item.quantity,
-      unit_price: dbProduct.price, // ✅ Usar precio real de la DB
+      unit_price: dbProduct.price,
     }))
 
-    const { error: itemsError } = await supabase.from("order_items").insert(orderItems)
+    const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
 
     if (itemsError) {
-      console.error("❌ Error al insertar order_items:", itemsError)
-
-      // Rollback: Eliminar la orden creada
-      await supabase.from("orders").delete().eq("id", orderId)
-
+      console.error('❌ Error al insertar order_items:', itemsError)
+      await supabase.from('orders').delete().eq('id', orderId)
+      // Rollback stock
+      for (const { item } of validatedItems) {
+        await supabase.rpc('increment_stock', { row_id: item.id, quantity_to_add: item.quantity })
+      }
       return NextResponse.json(
-        { error: "Error al crear los items de la orden", details: itemsError.message },
+        { error: 'Error al crear los items de la orden', details: itemsError.message },
         { status: 500 }
       )
     }
 
     console.log(`✅ ${orderItems.length} items insertados para la orden ${orderId}`)
+
+
 
     // ============================================
     // PASO 3: Crear la preferencia de Mercado Pago
